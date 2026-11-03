@@ -9,8 +9,6 @@ extends Node3D
 
 const SKIN := Color(1.0, 0.80, 0.69)
 const SKIN_SHADE := Color(0.98, 0.66, 0.58)
-const SLEEVE := Color(0.99, 0.58, 0.72)
-const CUFF := Color(1.0, 0.96, 0.94)
 
 var _cat: Node3D
 var _rig: Node3D
@@ -44,7 +42,7 @@ func play(duration: float) -> void:
 	_t = 0.0
 	visible = true
 	# Reach in from the side away from the camera so the back of the hand and the
-	# fingers are always readable (the sleeve then rises up and out of frame).
+	# fingers are always readable .
 	_fwd = 1.0
 	var cam := get_viewport().get_camera_3d()
 	if cam and _cat:
@@ -151,33 +149,13 @@ func _build() -> void:
 	_limb(_hand, t1, t2, 0.0235, 0.0205, skin)
 	var tn := _mi(_hand, _sph(0.0105), nail, t2 + Vector3(0.002, 0.014, 0.004), Vector3(0.95, 0.32, 1.25))
 	tn.rotation = Vector3(-0.5, 0.6, 0.0)
-	# --- wrist + sleeve cuff rising up/toward the viewer (+Z)
-	var arm_dir := Vector3(-0.5, 1.0, 0.55).normalized()
-	var wrist := Vector3(0.0, 0.004, 0.085)
-	wrist.x = 0.01
-	var cuff_a := wrist + arm_dir * 0.035
-	var cuff_b := cuff_a + arm_dir * 0.06
-	_limb(_hand, wrist - arm_dir * 0.02, cuff_a, 0.046, 0.048, skin)
-	_limb(_hand, cuff_a, cuff_b, 0.062, 0.062, _mat(CUFF, 0.9))
-	var ring := TorusMesh.new()
-	ring.inner_radius = 0.058
-	ring.outer_radius = 0.07
-	var rm := _mi(_hand, ring, _mat(Color(0.93, 0.45, 0.62), 0.9), cuff_b)
-	rm.basis = Basis(Quaternion(Vector3.UP, arm_dir))
-	var sleeve_end := cuff_b + arm_dir * 0.5
-	_limb(_hand, cuff_b, sleeve_end, 0.074, 0.098, _mat(SLEEVE, 0.95))
-	# polka dots on the sleeve
-	var ux := arm_dir.cross(Vector3.UP).normalized()
-	var uy := arm_dir.cross(ux).normalized()
-	for k in 9:
-		var along := 0.05 + k * 0.05
-		var ang := k * 2.4
-		var center := cuff_b + arm_dir * along
-		var radial := (ux * cos(ang) + uy * sin(ang)).normalized()
-		var rad := lerpf(0.074, 0.098, along / 0.5) * 0.985
-		var p0 := center + radial * rad
-		var dot := _mi(_hand, _sph(0.0125), _mat(Color(1, 0.95, 0.96), 0.9), p0)
-		dot.basis = Basis.looking_at(radial, arm_dir) * Basis.from_scale(Vector3(1, 1, 0.35))
+	# --- wrist: short soft stub that ends in a rounded cap (no arm / sleeve at all)
+	var wdir := Vector3(0.0, 0.18, 1.0).normalized()
+	var w0 := Vector3(0.0, 0.002, 0.07)
+	var w1 := w0 + wdir * 0.05
+	_limb(_hand, w0, w1, 0.050, 0.040, skin)
+	# soft shaded rim where the wrist ends so the cap reads as a gentle fade, not a cut
+	_mi(_hand, _sph(0.036), shade, w1 + wdir * 0.014, Vector3(1.0, 0.85, 0.7))
 
 func _process(delta: float) -> void:
 	if _t < 0.0 or _cat == null:
