@@ -1,4 +1,4 @@
-# 治愈猫 · Godot 4.7 原型（v0.1.0）
+# 治愈猫 · Godot 4.7 原型（v0.1.1）
 
 送礼向轻养成电子宠物猫（Vuena 绑定可爱猫 + 骨骼动画）。第一版：一只猫、温馨小房间、摸摸 / 喂食 / 逗逗，无死亡惩罚。
 
@@ -42,15 +42,16 @@
 
 | 路径 | 作用 |
 |------|------|
-| `project.godot` | 项目名「治愈猫」v0.1.0，主场景，Mobile + 横屏 |
+| `project.godot` | 项目名「治愈猫」v0.1.1，主场景，Mobile + 横屏 |
 | `scenes/main.tscn` | 温馨房间 + 绑定猫 + 灯光 + 手机 UI |
 | `assets/models/cute_cat_rigged.glb` | Vuena 绑定猫（LOD0，骨骼动画） |
+| `assets/icons/app_icon.png` | 可爱猫头应用图标（含 Android launcher / adaptive） |
 | `assets/sfx/*.wav` | 摸摸/喂食/逗逗轻音效（程序生成） |
 | `scripts/pet_stats.gd` | mood / hunger / bond |
 | `scripts/cat_controller.gd` | 摸喂逗、冷却、骨骼动画、旁白、音效 |
 | `scripts/main_ui.gd` | 大按钮、柔和进度条、冷却禁用 |
 | `export_presets.cfg` | Android arm64-v8a 导出预设 |
-| `build/治愈猫-0.1.0-debug.apk` | Debug APK（若已导出；默认 gitignore） |
+| `build/cute-cat-pet-0.1.1-debug.apk` | Debug APK（若已导出；默认 gitignore） |
 | `docs/superpowers/specs/2026-11-03-cute-cat-pet-design.md` | 设计规格 |
 | `docs/superpowers/plans/2026-11-03-cute-cat-pet-prototype.md` | 实现计划 |
 
@@ -62,7 +63,7 @@
 - **骨骼动画映射**：idle→`sit`，摸摸→`call`，喂食→`eat`，逗逗→`jump`
 - 旧 `tabby_cat_mobile.glb` 仍留作对照。
 
-## Android 导出（v0.1.0）
+## Android 导出（v0.1.1）
 
 ```bash
 source /workspace/xt/env.sh   # JAVA_HOME + Android SDK
@@ -71,7 +72,7 @@ export GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/workspace/xt/keys/debug.keystore
 export GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey
 export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
 /workspace/xt/bin/Godot_v4.7.2-stable_linux.x86_64 --path /workspace/cute-cat-pet --headless \
-  --export-debug Android /workspace/cute-cat-pet/build/治愈猫-0.1.0-debug.apk
+  --export-debug Android /workspace/cute-cat-pet/build/cute-cat-pet-0.1.1-debug.apk
 ```
 
 - 包名：`com.skberlee.cutecatpet`
@@ -79,7 +80,7 @@ export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
 - 模板：`~/.local/share/godot/export_templates/4.7.2.stable/`（指向 `/workspace/xt/godot_templates/4.7.2.stable/`）
 - Debug 签名：本机 `/workspace/xt/keys/debug.keystore`（经环境变量注入，不写入仓库）
 
-## 验收清单（0.1.0）
+## 验收清单（0.1.1）
 
 - [x] 温馨房间（窗光、家具道具）
 - [x] 绑定猫 sit/call/eat/jump + 中文甜句旁白 + 轻音效
