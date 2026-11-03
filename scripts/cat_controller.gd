@@ -9,6 +9,7 @@ signal cat_tapped
 @onready var stats: PetStats = %PetStats
 @onready var body: Node3D = %CatBody
 @onready var feedback_label: Label = %FeedbackLabel
+@onready var speech_bubble: Node = get_node_or_null("%SpeechBubble")
 
 ## Logical action -> skeletal clip on the Vuena cat AnimationPlayer.
 const CLIP_IDLE := "sit"
@@ -115,7 +116,8 @@ func _ready() -> void:
 		if not stats.milestone_unlocked.is_connected(_on_milestone):
 			stats.milestone_unlocked.connect(_on_milestone)
 		_apply_cosmetics_for_bond(stats.bond)
-	_say("来摸摸我吧～", false)
+	# Defer so SpeechBubble can finish setup / resolve camera.
+	call_deferred("_say", "来摸摸我吧～", false)
 	_auto_timer = _rng.randf_range(2.8, 5.0)
 
 func _process(delta: float) -> void:
@@ -184,6 +186,10 @@ func get_focus_point() -> Vector3:
 	# Approximate cat face for close-up framing.
 	return global_position + Vector3(0.0, 0.72, 0.08)
 
+func get_mouth_point() -> Vector3:
+	# Local muzzle: slightly low + forward (+Z rest pose faces camera).
+	return to_global(Vector3(0.06, 0.48, 0.26))
+
 func _lines_for(kind: String) -> Array:
 	match kind:
 		"pet":
@@ -211,6 +217,9 @@ func _pick(lines: Array) -> String:
 	return lines[_rng.randi_range(0, lines.size() - 1)]
 
 func _say(t: String, soft: bool = true) -> void:
+	if speech_bubble and speech_bubble.has_method("show_line"):
+		speech_bubble.show_line(t, soft)
+		return
 	if feedback_label == null:
 		return
 	feedback_label.text = t

@@ -16,6 +16,7 @@ extends CanvasLayer
 @onready var stats_card: PanelContainer = $Root/SafeMargin/Layout/StatsCard
 @onready var buttons: GridContainer = $Root/SafeMargin/Layout/Buttons
 @onready var feedback_label: Label = %FeedbackLabel
+@onready var speech_bubble: Node = %SpeechBubble
 @onready var camera: Camera3D = $"../Camera3D"
 @onready var room_cosmetics: RoomCosmetics = %RoomCosmetics
 @onready var safe_margin: MarginContainer = $Root/SafeMargin
@@ -57,6 +58,8 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_viewport_resized)
 	if feedback_label:
 		feedback_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if speech_bubble and speech_bubble.has_method("setup"):
+		speech_bubble.setup(camera, cat)
 	_on_viewport_resized()
 	_update_theme_button()
 
@@ -128,8 +131,7 @@ func _enter_zoom() -> void:
 	_cam_tween.tween_property(camera, "global_position", zoom_pos, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_cam_tween.tween_property(camera, "fov", 38.0 if _portrait else 34.0, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_cam_tween.tween_method(func(_t: float) -> void: _aim_camera(focus), 0.0, 1.0, 0.45)
-	if feedback_label:
-		feedback_label.text = "近距离看看我～点「返回」或再点我"
+	_bubble_say("近距离看看我～点「返回」或再点我")
 
 func _aim_camera(focus: Vector3) -> void:
 	if camera and is_instance_valid(cat):
@@ -303,10 +305,8 @@ func _apply_layout() -> void:
 		stats_card.offset_right = 0.0
 		stats_card.offset_top = 0.0
 		stats_card.offset_bottom = 172.0
-		if feedback_label:
-			feedback_label.offset_top = 180.0
-			feedback_label.offset_bottom = 228.0
-			feedback_label.add_theme_font_size_override("font_size", 22)
+		if speech_bubble and speech_bubble.has_method("set_portrait"):
+			speech_bubble.set_portrait(true)
 		# 2×2 grid: 摸摸/喂食 top, 逗逗/换装 bottom
 		buttons.columns = 2
 		buttons.offset_left = -168.0
@@ -337,10 +337,8 @@ func _apply_layout() -> void:
 		stats_card.offset_right = -12.0
 		stats_card.offset_top = 0.0
 		stats_card.offset_bottom = 156.0
-		if feedback_label:
-			feedback_label.offset_top = 8.0
-			feedback_label.offset_bottom = 56.0
-			feedback_label.add_theme_font_size_override("font_size", 26)
+		if speech_bubble and speech_bubble.has_method("set_portrait"):
+			speech_bubble.set_portrait(false)
 		buttons.columns = 4
 		buttons.offset_left = -380.0
 		buttons.offset_right = 380.0
@@ -379,6 +377,12 @@ func _on_busy(_action: String) -> void:
 func _on_ready_again() -> void:
 	_set_buttons_enabled(true)
 
+func _bubble_say(text: String, soft: bool = true) -> void:
+	if speech_bubble and speech_bubble.has_method("show_line"):
+		speech_bubble.show_line(text, soft)
+	elif feedback_label:
+		feedback_label.text = text
+
 func _on_pet() -> void:
 	if cat and cat.has_method("do_pet"):
 		cat.do_pet()
@@ -397,8 +401,7 @@ func _on_theme() -> void:
 	var id := room_cosmetics.cycle_next(stats.bond)
 	_play_ui()
 	_update_theme_button()
-	if feedback_label:
-		feedback_label.text = "房间换成「%s」啦" % room_cosmetics.theme_display_name(id)
+	_bubble_say("房间换成「%s」啦" % room_cosmetics.theme_display_name(id))
 	_save_game()
 
 func _on_milestone_ui(threshold: int, title: String) -> void:
