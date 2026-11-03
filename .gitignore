@@ -3,3 +3,8 @@
 *.apk
 *.aab
 .import/
+keys/
+*.keystore
+*.password
+*.idsig
+build/*.log
