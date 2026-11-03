@@ -95,9 +95,9 @@ omni_range = 3.2
 omni_attenuation = 1.4
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.939693, 0.34202, 0, -0.34202, 0.939693, 0, 1.48, 2.85)
+transform = Transform3D(1, 0, 0, 0, 0.939693, 0.34202, 0, -0.34202, 0.939693, 0, 1.42, 2.75)
 current = true
-fov = 48.0
+fov = 46.0
 
 [node name="Room" type="Node3D" parent="."]
 
@@ -247,7 +247,7 @@ grow_vertical = 2
 mouse_filter = 2
 theme_override_constants/margin_left = 36
 theme_override_constants/margin_top = 28
-theme_override_constants/margin_right = 36
+theme_override_constants/margin_right = 48
 theme_override_constants/margin_bottom = 28
 
 [node name="Layout" type="Control" parent="UI/Root/SafeMargin"]
@@ -354,7 +354,7 @@ theme_override_colors/font_color = Color(0.38, 0.26, 0.3, 1)
 text = "来摸摸我吧～"
 horizontal_alignment = 1
 
-[node name="Buttons" type="HBoxContainer" parent="UI/Root/SafeMargin/Layout"]
+[node name="Buttons" type="GridContainer" parent="UI/Root/SafeMargin/Layout"]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
@@ -362,13 +362,14 @@ anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -380.0
-offset_top = -84.0
+offset_top = -88.0
 offset_right = 380.0
 offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_constants/separation = 18
-alignment = 1
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 12
+columns = 4
 
 [node name="BtnPet" type="Button" parent="UI/Root/SafeMargin/Layout/Buttons"]
 unique_name_in_owner = true
@@ -402,3 +403,19 @@ size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 20
 text = "换装·锁定"
 disabled = true
+
+[node name="BtnZoomBack" type="Button" parent="UI/Root/SafeMargin/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = -64.0
+offset_right = 132.0
+offset_bottom = -8.0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 20
+text = "返回"
+
