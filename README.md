@@ -1,6 +1,6 @@
 # 治愈猫 · Godot 4.7 原型
 
-送礼向轻养成电子宠物猫（偏写实萌宠 3D 占位）。第一版：一只猫、一个小房间、摸摸 / 喂食 / 逗逗，无死亡惩罚。
+送礼向轻养成电子宠物猫（偏写实萌宠 3D（Grab3D 虎斑猫））。第一版：一只猫、一个小房间、摸摸 / 喂食 / 逗逗，无死亡惩罚。
 
 ## 环境
 
@@ -28,7 +28,7 @@
 
 ## 怎么玩
 
-1. 进入温馨小房间，中间是占位猫（胶囊+球体）。
+1. 进入温馨小房间，中间是写实虎斑猫模型（CC0，手机优化约 4.6 万三角）。
 2. 点底部 **摸摸 / 喂食 / 逗逗**：
    - 摸摸：心情↑、亲密↑，旁白「呼噜～再摸摸」，猫轻微弹跳
    - 喂食：饥饿↓、心情↑，「喵，好吃！」
@@ -42,12 +42,22 @@
 | 路径 | 作用 |
 |------|------|
 | `project.godot` | 项目名「治愈猫」，主场景 `scenes/main.tscn`，Mobile 渲染 |
-| `scenes/main.tscn` | 房间 + 占位猫 + 相机灯光 + UI |
+| `scenes/main.tscn` | 房间 + 虎斑猫 + 相机灯光 + UI |
+| `assets/models/tabby_cat_mobile.glb` | Grab3D Tabby Cat 轻量简化版（游戏内） |
+| `assets/models/CAT_LICENSE.txt` | CC0 许可与来源说明 |
 | `scripts/pet_stats.gd` | mood / hunger / bond |
 | `scripts/cat_controller.gd` | 摸喂逗、冷却、弹跳、旁白 |
 | `scripts/main_ui.gd` | 按钮与进度条绑定 |
 | `docs/superpowers/specs/2026-11-03-cute-cat-pet-design.md` | 设计规格 |
 | `docs/superpowers/plans/2026-11-03-cute-cat-pet-prototype.md` | 实现计划 |
+
+
+## 3D 猫模型
+
+- **来源**：[Grab3D Tabby Cat](https://grab3d.com/models/animals/cat/)（`cat-light.glb`）
+- **许可**：CC0 1.0（详见 `assets/models/CAT_LICENSE.txt`）
+- **游戏内**：`tabby_cat_mobile.glb`（gltf-transform 简化，约 46k tris / 1.7MB）
+- **动画**：原模无骨骼动画；`CatAnim` 用缩放/旋转/位移做 idle / pet / feed / play。骨骼级动作需后续换带动画的模型。
 
 ## Android 导出备注（尚未正式导出 APK）
 
@@ -63,8 +73,8 @@
 
 ## 验收清单（原型）
 
-- [x] 打开主场景可见房间与占位猫
+- [x] 打开主场景可见房间与写实虎斑猫
 - [x] 三个中文按钮可点，数值按设计变化
-- [x] 可见弹跳反馈 + 中文旁白
+- [x] 可见柔和动画反馈（摸摸/喂食/逗逗）+ 中文旁白
 - [x] hunger/mood 随时间缓慢变化
 - [x] Godot 4.7.2 无头加载无脚本错误
