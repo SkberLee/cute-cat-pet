@@ -69,9 +69,21 @@ const LINES_MILESTONE := {
 	100: "永远和你在一起，好不好",
 }
 
-## Keep wander inside the soft rug / floor play area.
-const FLOOR_MIN := Vector3(-1.15, 0.0, -0.55)
-const FLOOR_MAX := Vector3(1.15, 0.0, 1.05)
+## Free roaming bounds: whole room floor with wall / furniture margins.
+## Room floor is x[-3.1, 3.1], z[-2.55, 2.6].
+const FLOOR_MIN := Vector3(-2.3, 0.0, -1.55)
+const FLOOR_MAX := Vector3(2.3, 0.0, 1.55)
+## Furniture the cat should walk around: (x, z, radius incl. cat body margin).
+const OBSTACLES := [
+	Vector3(1.7, 0.55, 0.75),   # side table + lamp
+	Vector3(1.55, -0.9, 0.8),   # cushion
+	Vector3(-1.85, -1.7, 0.6),  # plant
+	Vector3(-0.85, 0.55, 0.3),  # food bowl
+]
+const MOUTH_DY := 0.0
+const MOUTH_DZ := 0.0
+const WALK_SPEED := 0.95
+const TURN_SPEED := 9.0
 
 var anim: AnimationPlayer
 var _cooldown := 0.0
@@ -91,6 +103,11 @@ var _auto_timer := 3.5
 var _wandering := false
 var _wander_target := Vector3.ZERO
 var _auto_busy := false
+var _autonomy_paused := false
+var _rest_timer := 0.0
+var _face_tween: Tween
+var _jaw_skel: Skeleton3D
+var _jaw_bone := -1
 var _home_y := 0.0
 var _hit_body: StaticBody3D
 
@@ -101,6 +118,7 @@ func _ready() -> void:
 	_setup_heart_cosmetic()
 	_setup_tap_collider()
 	anim = _resolve_anim_player()
+	_resolve_jaw()
 	if anim:
 		_ensure_idle_loops()
 		if not anim.animation_finished.is_connected(_on_anim_finished):
@@ -118,7 +136,7 @@ func _ready() -> void:
 		_apply_cosmetics_for_bond(stats.bond)
 	# Defer so SpeechBubble can finish setup / resolve camera.
 	call_deferred("_say", "来摸摸我吧～", false)
-	_auto_timer = _rng.randf_range(2.8, 5.0)
+	_auto_timer = _rng.randf_range(1.5, 2.8)
 
 func _process(delta: float) -> void:
 	var was_busy := _cooldown > 0.0
@@ -186,9 +204,20 @@ func get_focus_point() -> Vector3:
 	# Approximate cat face for close-up framing.
 	return global_position + Vector3(0.0, 0.72, 0.08)
 
+func _resolve_jaw() -> void:
+	if body == null:
+		return
+	var sk := body.find_child("Skeleton3D", true, false)
+	if sk is Skeleton3D:
+		_jaw_skel = sk as Skeleton3D
+		_jaw_bone = _jaw_skel.find_bone("Jaw")
+
 func get_mouth_point() -> Vector3:
-	# Local muzzle: slightly low + forward (+Z rest pose faces camera).
-	return to_global(Vector3(0.06, 0.48, 0.26))
+	# Follows the animated Jaw bone (so walking / eating / jumping stay anchored).
+	if _jaw_skel and _jaw_bone >= 0:
+		var jaw: Vector3 = _jaw_skel.global_transform * _jaw_skel.get_bone_global_pose(_jaw_bone).origin
+		return jaw + global_transform.basis * Vector3(0.0, MOUTH_DY, MOUTH_DZ)
+	return to_global(Vector3(0.0, 0.45, 0.3))
 
 func _lines_for(kind: String) -> Array:
 	match kind:
@@ -361,12 +390,21 @@ func _on_anim_finished(_anim_name: StringName) -> void:
 	if _auto_busy:
 		_auto_busy = false
 		_play_idle()
-		_auto_timer = _rng.randf_range(3.2, 6.5)
+		_auto_timer = _rng.randf_range(1.5, 3.2)
 		return
 	_play_idle()
 
+func set_autonomy_paused(paused: bool) -> void:
+	_autonomy_paused = paused
+	if paused:
+		_cancel_autonomy()
+		_play_idle()
+
+func is_wandering() -> bool:
+	return _wandering
+
 func _tick_autonomy(delta: float) -> void:
-	if _cooldown > 0.0:
+	if _cooldown > 0.0 or _autonomy_paused:
 		return
 	if _wandering:
 		_update_wander(delta)
@@ -379,20 +417,19 @@ func _tick_autonomy(delta: float) -> void:
 	_choose_autonomy()
 
 func _choose_autonomy() -> void:
-	_auto_timer = _rng.randf_range(3.5, 7.0)
-	var roll := _rng.randi_range(0, 5)
-	match roll:
-		0, 1:
-			_play_idle()
-		2:
-			_play_auto_clip("idle_alt")
-		3:
-			_play_auto_clip("jump")
-			_say(_pick(LINES_AUTO), true)
-		4:
-			_play_auto_clip("idle")
-		_:
-			_start_wander()
+	# More wandering than standing around: roam most of the time.
+	_auto_timer = _rng.randf_range(1.5, 3.5)
+	_idle_clip = CLIP_IDLE
+	var roll := _rng.randi_range(0, 9)
+	if roll <= 5:
+		_start_wander()
+	elif roll == 6:
+		_play_auto_clip("idle_alt")
+	elif roll == 7:
+		_play_auto_clip("jump")
+		_say(_pick(LINES_AUTO), true)
+	else:
+		_play_idle()
 
 func _play_auto_clip(clip: String) -> void:
 	if anim == null or not anim.has_animation(clip):
@@ -408,50 +445,112 @@ func _play_auto_clip(clip: String) -> void:
 			_play_idle()
 	)
 
-func _start_wander() -> void:
-	var target := Vector3(
-		_rng.randf_range(FLOOR_MIN.x, FLOOR_MAX.x),
-		_home_y,
-		_rng.randf_range(FLOOR_MIN.z, FLOOR_MAX.z)
-	)
-	if target.distance_to(position) < 0.35:
+func _segment_hits_obstacle(a: Vector3, b: Vector3) -> bool:
+	for o in OBSTACLES:
+		var c := Vector2(o.x, o.y)
+		var p0 := Vector2(a.x, a.z)
+		var p1 := Vector2(b.x, b.z)
+		var d := p1 - p0
+		var len2 := d.length_squared()
+		var t := 0.0
+		if len2 > 0.0001:
+			t = clampf((c - p0).dot(d) / len2, 0.0, 1.0)
+		if (p0 + d * t).distance_to(c) < o.z:
+			return true
+	return false
+
+func _pick_wander_target() -> Vector3:
+	var best := Vector3.INF
+	for i in 24:
+		var t := Vector3(
+			_rng.randf_range(FLOOR_MIN.x, FLOOR_MAX.x),
+			_home_y,
+			_rng.randf_range(FLOOR_MIN.z, FLOOR_MAX.z)
+		)
+		if t.distance_to(position) < 0.9:
+			continue
+		if _segment_hits_obstacle(position, t):
+			continue
+		return t
+	return best
+
+func _start_wander(forced_target: Vector3 = Vector3.INF) -> void:
+	var target := forced_target
+	if target == Vector3.INF:
+		target = _pick_wander_target()
+	if target == Vector3.INF:
 		_play_auto_clip("idle_alt")
 		return
+	target.x = clampf(target.x, FLOOR_MIN.x, FLOOR_MAX.x)
+	target.z = clampf(target.z, FLOOR_MIN.z, FLOOR_MAX.z)
+	target.y = _home_y
+	if _face_tween and _face_tween.is_valid():
+		_face_tween.kill()
 	_wander_target = target
 	_wandering = true
 	_auto_busy = true
-	face_world_point(target)
-	if anim and anim.has_animation("walk"):
-		anim.play("walk")
-	elif anim and anim.has_animation("run"):
-		anim.play("run")
-	_say(_pick(LINES_AUTO), true)
+	var walk_clip := "walk" if anim and anim.has_animation("walk") else "run"
+	if anim and anim.has_animation(walk_clip):
+		anim.play(walk_clip)
+	if _rng.randf() < 0.45:
+		_say(_pick(LINES_AUTO), true)
 
 func _update_wander(delta: float) -> void:
 	var flat_pos := Vector3(position.x, _home_y, position.z)
-	var flat_tgt := Vector3(_wander_target.x, _home_y, _wander_target.z)
-	var to := flat_tgt - flat_pos
+	var to := Vector3(_wander_target.x, _home_y, _wander_target.z) - flat_pos
 	var dist := to.length()
-	if dist < 0.08:
+	if dist < 0.06:
 		_finish_wander()
 		return
-	var step := minf(0.85 * delta, dist)
-	position = flat_pos + to.normalized() * step
+	var dir := to / dist
+	# Turn smoothly toward the walking direction (rest pose faces +Z).
+	var want_yaw := atan2(dir.x, dir.z)
+	rotation.y = lerp_angle(rotation.y, want_yaw, clampf(TURN_SPEED * delta, 0.0, 1.0))
+	var step := minf(WALK_SPEED * delta, dist)
+	position = flat_pos + dir * step
 	position.y = _home_y
-	face_world_point(_wander_target)
-	# Soft clamp inside play AABB.
 	position.x = clampf(position.x, FLOOR_MIN.x, FLOOR_MAX.x)
 	position.z = clampf(position.z, FLOOR_MIN.z, FLOOR_MAX.z)
 
 func _finish_wander() -> void:
 	_wandering = false
 	_auto_busy = false
-	# Face roughly toward camera / room front.
-	rotation = Vector3.ZERO
-	_play_idle()
-	_auto_timer = _rng.randf_range(3.5, 6.5)
+	_face_front(0.3)
+	# At the destination do something cute for a bit.
+	var roll := _rng.randi_range(0, 9)
+	_auto_timer = _rng.randf_range(1.5, 3.0)
+	if roll <= 3:
+		_idle_clip = CLIP_IDLE
+		_play_idle()
+	elif roll == 4 or roll == 5:
+		_idle_clip = "idle" if anim and anim.has_animation("idle") else CLIP_IDLE
+		_play_idle()
+	elif roll == 6:
+		_play_auto_clip("idle_alt")
+	elif roll == 7:
+		_play_auto_clip("jump")
+	else:
+		# Nap: loop sleep for a few seconds, then wake up.
+		if anim and anim.has_animation("sleep"):
+			_idle_clip = "sleep"
+			_auto_timer = _rng.randf_range(4.0, 6.5)
+		_play_idle()
+
+func _face_front(duration: float, jitter: float = 0.5) -> void:
+	# Turn toward the camera side with a small random yaw for variety.
+	var target_yaw := _rng.randf_range(-jitter, jitter)
+	if _face_tween and _face_tween.is_valid():
+		_face_tween.kill()
+	var start := rotation.y
+	var end := start + wrapf(target_yaw - start, -PI, PI)
+	_face_tween = create_tween()
+	_face_tween.tween_property(self, "rotation:y", end, duration).set_trans(Tween.TRANS_SINE)
 
 func _cancel_autonomy() -> void:
+	var was_wandering := _wandering
 	_wandering = false
 	_auto_busy = false
-	_auto_timer = _rng.randf_range(4.0, 7.5)
+	_idle_clip = CLIP_IDLE
+	_auto_timer = _rng.randf_range(3.0, 5.5)
+	if was_wandering or absf(wrapf(rotation.y, -PI, PI)) > 0.05:
+		_face_front(0.25, 0.0)
