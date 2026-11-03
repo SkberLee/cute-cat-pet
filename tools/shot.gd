@@ -41,6 +41,13 @@ func _run() -> void:
 			cat._cooldown = 0.0
 			main.get_node("UI")._on_pet()
 			wait = float(opts.get("t", "0.75"))
+		"zoompet":
+			main.get_node("UI")._enter_zoom()
+			for i in 40:
+				await process_frame
+			cat._cooldown = 0.0
+			main.get_node("UI")._on_pet()
+			wait = float(opts.get("t", "0.9"))
 		"pickfeed":
 			main.get_node("UI")._on_feed()
 			wait = 0.3
@@ -55,6 +62,13 @@ func _run() -> void:
 				await process_frame
 				guard += 0.016
 			wait = float(opts.get("t", "0.7"))
+		"mouseshow":   # static toy mouse placed in front of the cat (use cam=/look= with rel=1)
+			cat.set_autonomy_paused(true)
+			var mo: Node3D = load("res://scripts/cat_props.gd").make_toy("mouse")
+			main.add_child(mo)
+			mo.global_position = cat.global_position + Vector3(0.0, 0.0, 0.0) + Vector3(float(opts.get("mx", "1.0")), 0.0, 0.0)
+			mo.rotation.y = float(opts.get("my", "0.5"))
+			wait = 0.3
 		"toy":
 			cat._cooldown = 0.0
 			cat.do_play(opts.get("toy", "wand"))

@@ -8,6 +8,7 @@ var _dur := 1.6
 var _camera: Camera3D
 var _cat: Node3D
 var _hearts: Array = []
+var hand3d: PetHand3D
 
 func setup(camera: Camera3D, cat: Node3D) -> void:
 	_camera = camera
@@ -15,9 +16,12 @@ func setup(camera: Camera3D, cat: Node3D) -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	visible = false
+	hand3d = PetHand3D.new()
+	hand3d.setup(cat)
 
 func play(duration: float) -> void:
-	_dur = maxf(duration, 0.8)
+	_dur = maxf(duration, 2.2)
+	hand3d.play(_dur)
 	_t = 0.0
 	_hearts.clear()
 	visible = true
@@ -58,10 +62,6 @@ func _draw() -> void:
 	var sweep := sin(phase)
 	var pos := p0 + Vector2(sweep * 1.3 * s, -1.25 * s + absf(cos(phase)) * 0.14 * s)
 	pos += Vector2(1.6 * s, -1.4 * s) * (1.0 - ease_v)   # slides in from upper right
-	var tilt := -0.18 + 0.22 * sweep
-	draw_set_transform(pos, tilt, Vector2.ONE)
-	_draw_hand(s * 0.56, ease_v)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# floating hearts
 	var n := int(_t / 0.35)
 	for i in n:
@@ -69,8 +69,8 @@ func _draw() -> void:
 		var age := _t - born
 		if age > 1.1:
 			continue
-		var hx := p0.x + sin(float(i) * 2.3) * 1.4 * s
-		var hy := p0.y - 2.6 * s - age * 1.2 * s
+		var hx := p0.x - 0.9 * s + sin(float(i) * 2.3) * 0.5 * s
+		var hy := p0.y - 1.0 * s - age * 1.1 * s
 		_heart(Vector2(hx, hy), 0.30 * s, Color(1.0, 0.45, 0.6, clampf(1.1 - age, 0.0, 1.0)))
 
 func _heart(c: Vector2, r: float, col: Color) -> void:
