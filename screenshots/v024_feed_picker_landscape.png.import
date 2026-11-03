@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ckqeowwh4sa6e"
-path="res://.godot/imported/p2.png-ab975f48cb8625356c105222cca4b6ed.ctex"
+uid="uid://vbaavdwfq605"
+path="res://.godot/imported/v024_feed_picker_landscape.png-5281b81b40e64f66d94b904530fd8685.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://screenshots/base/p2.png"
-dest_files=["res://.godot/imported/p2.png-ab975f48cb8625356c105222cca4b6ed.ctex"]
+source_file="res://screenshots/v024_feed_picker_landscape.png"
+dest_files=["res://.godot/imported/v024_feed_picker_landscape.png-5281b81b40e64f66d94b904530fd8685.ctex"]
 
 [params]
 

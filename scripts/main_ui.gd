@@ -40,6 +40,9 @@ const CAM_FOLLOW_SPEED := 5.0
 const BASE_PORTRAIT := Vector2i(720, 1280)
 const BASE_LANDSCAPE := Vector2i(1280, 720)
 var _ui_scale := 1.0
+var food_picker: PickPanel
+var toy_picker: PickPanel
+var pet_hand: PetHand
 
 func _ready() -> void:
 	_style_ui()
@@ -58,8 +61,11 @@ func _ready() -> void:
 			cat.interaction_started.connect(_on_busy)
 		if cat.has_signal("interaction_ready"):
 			cat.interaction_ready.connect(_on_ready_again)
+		if cat.has_signal("pet_stroke"):
+			cat.pet_stroke.connect(_on_pet_stroke)
 		if cat.has_signal("save_requested"):
 			cat.save_requested.connect(_save_game)
+	_build_pickers()
 	if stats:
 		stats.stats_changed.connect(_refresh)
 		if stats.has_signal("milestone_unlocked"):
@@ -137,6 +143,8 @@ func _focus_for_cat() -> Vector3:
 	if cat:
 		# The model's origin is at its tail end; aim at the body centre instead.
 		c = cat.global_position + cat.global_transform.basis.z * 0.35
+		if cat.get("has_anchor"):
+			c = c.lerp(cat.get("action_anchor"), 0.5)
 	return Vector3(c.x * CAM_FOLLOW_K, _cam_focus_y, c.z * CAM_FOLLOW_K)
 
 func _cam_pos_for(focus: Vector3) -> Vector3:
@@ -163,6 +171,7 @@ func _enter_zoom() -> void:
 	if camera == null or cat == null:
 		return
 	_zoomed = true
+	_close_pickers()
 	_cam_follow = false
 	if cat.has_method("set_autonomy_paused"):
 		cat.set_autonomy_paused(true)
@@ -481,6 +490,7 @@ func _apply_layout() -> void:
 		_cam_focus_y = 0.55
 	if btn_theme:
 		btn_theme.add_theme_font_size_override("font_size", 34 if _portrait else 28)
+	_layout_pickers(ins)
 	if not _zoomed:
 		_restore_camera(false)
 
@@ -502,16 +512,98 @@ func _bubble_say(text: String, soft: bool = true) -> void:
 		feedback_label.text = text
 
 func _on_pet() -> void:
+	_close_pickers()
 	if cat and cat.has_method("do_pet"):
 		cat.do_pet()
 
 func _on_feed() -> void:
-	if cat and cat.has_method("do_feed"):
-		cat.do_feed()
+	# The feed button opens the food picker; picking a food starts the sequence.
+	if food_picker == null:
+		if cat and cat.has_method("do_feed"):
+			cat.do_feed()
+		return
+	var open := not food_picker.visible
+	_close_pickers()
+	food_picker.visible = open
+	_play_ui()
 
 func _on_play() -> void:
+	if toy_picker == null:
+		if cat and cat.has_method("do_play"):
+			cat.do_play()
+		return
+	var open := not toy_picker.visible
+	_close_pickers()
+	toy_picker.visible = open
+	_play_ui()
+
+func _on_food_picked(id: String) -> void:
+	_close_pickers()
+	if cat and cat.has_method("do_feed"):
+		cat.do_feed(id)
+
+func _on_toy_picked(id: String) -> void:
+	_close_pickers()
 	if cat and cat.has_method("do_play"):
-		cat.do_play()
+		cat.do_play(id)
+
+func _close_pickers() -> void:
+	if food_picker:
+		food_picker.visible = false
+	if toy_picker:
+		toy_picker.visible = false
+
+func _on_pet_stroke(duration: float) -> void:
+	if pet_hand:
+		pet_hand.play(duration)
+
+func _build_pickers() -> void:
+	var root := $Root
+	var names: Array = []
+	for id in CatProps.FOOD_ORDER:
+		names.append(CatProps.FOODS[id]["name"])
+	food_picker = PickPanel.new()
+	food_picker.name = "FoodPicker"
+	root.add_child(food_picker)
+	food_picker.setup("想吃什么呢？", CatProps.FOOD_ORDER, names)
+	food_picker.picked.connect(_on_food_picked)
+	names = []
+	for id in CatProps.TOY_ORDER:
+		names.append(CatProps.TOYS[id]["name"])
+	toy_picker = PickPanel.new()
+	toy_picker.name = "ToyPicker"
+	root.add_child(toy_picker)
+	toy_picker.setup("玩什么呢？", CatProps.TOY_ORDER, names)
+	toy_picker.picked.connect(_on_toy_picked)
+	pet_hand = PetHand.new()
+	pet_hand.name = "PetHand"
+	root.add_child(pet_hand)
+	pet_hand.setup(camera, cat)
+
+func _layout_pickers(ins: Vector4) -> void:
+	if food_picker == null:
+		return
+	for pk in [food_picker, toy_picker]:
+		pk.anchor_top = 1.0
+		pk.anchor_bottom = 1.0
+		if _portrait:
+			var bottom := -(118.0 * 2.0 + 16.0 + 26.0 + ins.w + 14.0)
+			pk.anchor_left = 0.0
+			pk.anchor_right = 1.0
+			pk.offset_left = 24.0 + ins.x
+			pk.offset_right = -(24.0 + ins.z)
+			pk.offset_bottom = bottom
+			pk.offset_top = bottom - 250.0
+			pk.set_metrics(30, 250.0)
+		else:
+			var bottom := -(92.0 + 24.0 + ins.w + 12.0)
+			pk.anchor_left = 0.5
+			pk.anchor_right = 0.5
+			pk.offset_left = -480.0
+			pk.offset_right = 480.0
+			pk.offset_bottom = bottom
+			pk.offset_top = bottom - 190.0
+			pk.set_metrics(26, 190.0)
 
 func _on_theme() -> void:
 	if room_cosmetics == null or stats == null:

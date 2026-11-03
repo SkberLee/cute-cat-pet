@@ -42,6 +42,21 @@ func feed() -> void:
 	_check_milestones()
 	stats_changed.emit()
 
+func feed_with(hunger_delta: float, mood_delta: float) -> void:
+	hunger -= hunger_delta
+	mood += mood_delta
+	_clamp_all()
+	_check_milestones()
+	stats_changed.emit()
+
+func play_with(mood_delta: float, bond_delta: float, hunger_delta: float) -> void:
+	mood += mood_delta
+	bond += bond_delta
+	hunger += hunger_delta
+	_clamp_all()
+	_check_milestones()
+	stats_changed.emit()
+
 func play() -> void:
 	mood += 10.0
 	bond += 5.0

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dfjyfqoryrlx2"
-path="res://.godot/imported/t_z.png-0f7031aefcac69db301e91a48ef5ad15.ctex"
+uid="uid://brlhf3643h6pw"
+path="res://.godot/imported/v024_eating_can_landscape.png-4d89c6626f930abf62547255cd1a1ffa.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://screenshots/t_z.png"
-dest_files=["res://.godot/imported/t_z.png-0f7031aefcac69db301e91a48ef5ad15.ctex"]
+source_file="res://screenshots/v024_eating_can_landscape.png"
+dest_files=["res://.godot/imported/v024_eating_can_landscape.png-4d89c6626f930abf62547255cd1a1ffa.ctex"]
 
 [params]
 

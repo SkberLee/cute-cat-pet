@@ -131,9 +131,9 @@ material = SubResource("MatWood")
 
 [node name="Rug" type="CSGCylinder3D" parent="Room"]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0.25)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.006, 0.25)
 radius = 1.25
-height = 0.035
+height = 0.012
 material = SubResource("MatRug")
 
 [node name="WindowFrame" type="CSGBox3D" parent="Room"]

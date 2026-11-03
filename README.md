@@ -1,4 +1,4 @@
-# 治愈猫 · Godot 4.7 原型（v0.2.3）
+# 治愈猫 · Godot 4.7 原型（v0.2.4）
 
 送礼向轻养成电子宠物猫（Vuena 绑定可爱猫 + 骨骼动画）。轻养成 + 治愈日常：一只猫、温馨小房间、摸摸 / 喂食 / 逗逗，无死亡惩罚。
 
@@ -8,6 +8,14 @@
 - 渲染：`mobile`（面向 Android）
 - 语言：GDScript，UI 简体中文
 - **屏幕方向：自动旋转（sensor）** — 横竖屏都会适配 UI；基准分辨率 1280×720（竖屏 720×1280）
+
+## v0.2.4 新内容
+
+- 猫脚：四只脚有趾缝和粉色肉垫（程序化网格，挂在脚骨骼上）。
+- 摸摸：一只卡通小手在猫头顶来回抚摸，配爱心。
+- 喂食：弹出食物选择（小鱼干 / 猫粮 / 罐头 / 牛奶），食物出现在猫面前，猫走过去低头吃，食物逐渐变少；不同食物台词和数值不同。
+- 逗逗：弹出玩具选择（逗猫棒 / 毛线球 / 激光点 / 小老鼠），各自有不同的运动方式和猫的反应（扑、跳、追跑）。
+- 新增 `smoke_interactions.gd`；横竖屏均可用。
 
 ## v0.2.3 新内容
 
@@ -52,6 +60,7 @@
 /workspace/xt/bin/Godot_v4.7.2-stable_linux.x86_64 --path /workspace/cute-cat-pet --headless -s res://scripts/smoke_hud_zoom.gd
 /workspace/xt/bin/Godot_v4.7.2-stable_linux.x86_64 --path /workspace/cute-cat-pet --headless -s res://scripts/smoke_autonomy.gd
 /workspace/xt/bin/Godot_v4.7.2-stable_linux.x86_64 --path /workspace/cute-cat-pet --headless -s res://scripts/smoke_speech.gd
+/workspace/xt/bin/Godot_v4.7.2-stable_linux.x86_64 --path /workspace/cute-cat-pet --headless -s res://scripts/smoke_interactions.gd
 ```
 
 ## 怎么玩
@@ -79,7 +88,7 @@
 
 GitHub Releases：https://github.com/SkberLee/cute-cat-pet/releases
 
-推荐安装 `cute-cat-pet-0.2.3-release.apk`。若已装旧 debug 包，请先卸载再装（签名不同）。
+推荐安装 `cute-cat-pet-0.2.4-release.apk`。若已装旧 debug 包，请先卸载再装（签名不同）。
 
 ## 授权
 

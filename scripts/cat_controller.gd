@@ -5,6 +5,10 @@ signal interaction_started(action: String)
 signal interaction_ready
 signal save_requested
 signal cat_tapped
+## Emitted when the pet reaction starts, with the reaction clip length (UI shows the stroking hand).
+signal pet_stroke(duration: float)
+## Emitted when a feed / play choreography ends.
+signal action_finished(kind: String)
 
 @onready var stats: PetStats = %PetStats
 @onready var body: Node3D = %CatBody
@@ -110,6 +114,19 @@ var _jaw_skel: Skeleton3D
 var _jaw_bone := -1
 var _home_y := 0.0
 var _hit_body: StaticBody3D
+var _head_bone := -1
+## While a feed / play sequence runs, the camera frames the cat and this point together.
+var action_anchor := Vector3.ZERO
+var has_anchor := false
+
+# Feed / play choreography state
+var action_phase := ""            # "", "walk", "eat", "chase", "wand" ...
+var action_kind := ""
+var _action_id := 0
+var _props: Array = []
+const EAT_REACH := 0.64           # cat origin -> muzzle distance along facing
+const CHASE_STOP := 0.72
+const RUN_SPEED := 1.9
 
 func _ready() -> void:
 	_rng.randomize()
@@ -166,13 +183,17 @@ func do_pet() -> void:
 	_cancel_autonomy()
 	stats.pet()
 	_play_oneshot(CLIP_PET)
+	pet_stroke.emit(maxf(_cooldown, 1.2))
 	_say(_pick(_lines_for("pet")))
 	_play_sfx(_sfx_pet)
 	_apply_cosmetics_for_bond(stats.bond)
 	save_requested.emit()
 
-func do_feed() -> void:
+func do_feed(food_id: String = "") -> void:
 	if not _begin("feed"):
+		return
+	if CatProps.FOODS.has(food_id):
+		_run_feed(food_id)
 		return
 	_cancel_autonomy()
 	stats.feed()
@@ -181,8 +202,11 @@ func do_feed() -> void:
 	_play_sfx(_sfx_feed)
 	save_requested.emit()
 
-func do_play() -> void:
+func do_play(toy_id: String = "") -> void:
 	if not _begin("play"):
+		return
+	if CatProps.TOYS.has(toy_id):
+		_run_play(toy_id)
 		return
 	_cancel_autonomy()
 	stats.play()
@@ -211,6 +235,8 @@ func _resolve_jaw() -> void:
 	if sk is Skeleton3D:
 		_jaw_skel = sk as Skeleton3D
 		_jaw_bone = _jaw_skel.find_bone("Jaw")
+		_head_bone = _jaw_skel.find_bone("Head")
+		CatPaws.build(_jaw_skel)
 
 func get_mouth_point() -> Vector3:
 	# Follows the animated Jaw bone (so walking / eating / jumping stay anchored).
@@ -343,13 +369,15 @@ func _resolve_anim_player() -> AnimationPlayer:
 	return null
 
 func _ensure_idle_loops() -> void:
-	for clip in ["sit", "idle", "idle_alt", "sleep", "walk"]:
+	for clip in ["sit", "idle", "idle_alt", "sleep", "walk", "run"]:
 		if not anim.has_animation(clip):
 			continue
 		var a: Animation = anim.get_animation(clip)
 		if a and clip != "walk":
 			a.loop_mode = Animation.LOOP_LINEAR
 		elif a and clip == "walk":
+			a.loop_mode = Animation.LOOP_LINEAR
+		if a and clip == "run":
 			a.loop_mode = Animation.LOOP_LINEAR
 
 func _play_idle() -> void:
@@ -385,7 +413,7 @@ func _soft_tween_fallback(kind: String) -> void:
 			tw.tween_property(body, "rotation_degrees:z", 0.0, 0.12)
 
 func _on_anim_finished(_anim_name: StringName) -> void:
-	if _wandering:
+	if action_phase != "" or _wandering:
 		return
 	if _auto_busy:
 		_auto_busy = false
@@ -396,6 +424,8 @@ func _on_anim_finished(_anim_name: StringName) -> void:
 
 func set_autonomy_paused(paused: bool) -> void:
 	_autonomy_paused = paused
+	if action_phase != "":
+		return
 	if paused:
 		_cancel_autonomy()
 		_play_idle()
@@ -547,6 +577,8 @@ func _face_front(duration: float, jitter: float = 0.5) -> void:
 	_face_tween.tween_property(self, "rotation:y", end, duration).set_trans(Tween.TRANS_SINE)
 
 func _cancel_autonomy() -> void:
+	if action_phase != "":
+		return
 	var was_wandering := _wandering
 	_wandering = false
 	_auto_busy = false
@@ -554,3 +586,454 @@ func _cancel_autonomy() -> void:
 	_auto_timer = _rng.randf_range(3.0, 5.5)
 	if was_wandering or absf(wrapf(rotation.y, -PI, PI)) > 0.05:
 		_face_front(0.25, 0.0)
+
+
+# ==================================================================
+# Head anchor (pet hand), feed + play choreography
+# ==================================================================
+
+func get_head_point() -> Vector3:
+	if _jaw_skel and _head_bone >= 0:
+		var h: Vector3 = _jaw_skel.global_transform * _jaw_skel.get_bone_global_pose(_head_bone).origin
+		return h + Vector3(0.0, 0.34, 0.0)
+	return global_position + Vector3(0.0, 0.9, 0.3)
+
+func is_busy_action() -> bool:
+	return action_phase != ""
+
+const FOOD_LINES := {
+	"fish": {
+		"start": ["是小鱼干！我来啦", "闻到鱼香味了～"],
+		"eat": ["咔嚓咔嚓～香香的", "小鱼干最好吃啦", "鱼干鱼干，喵！"],
+	},
+	"kibble": {
+		"start": ["开饭啦～", "猫粮的声音！"],
+		"eat": ["嘎吱嘎吱，脆脆的", "吃饱饱才有力气玩", "饱饱的，幸福"],
+	},
+	"can": {
+		"start": ["罐罐！好香呀～", "是罐头吗？快快快"],
+		"eat": ["软软的，好满足", "罐罐最好吃了", "呼噜呼噜…太幸福"],
+	},
+	"milk": {
+		"start": ["有牛奶喝～", "甜甜的奶香味"],
+		"eat": ["舔舔～甜甜的奶", "喝完嘴巴白白的", "温温的，好舒服"],
+	},
+}
+const TOY_LINES := {
+	"wand": {
+		"start": ["羽毛！看我扑", "逗猫棒～抓住你"],
+		"end": ["差一点点就抓到了", "再来一次嘛"],
+	},
+	"yarn": {
+		"start": ["毛线球滚起来啦", "球球别跑！"],
+		"end": ["抓到球球啦", "咕噜咕噜，好好玩"],
+	},
+	"laser": {
+		"start": ["红点点！哪里跑", "盯住盯住…"],
+		"end": ["红点点怎么没啦？", "喵？它躲起来了"],
+	},
+	"mouse": {
+		"start": ["小老鼠！别跑", "吱吱吱？抓你！"],
+		"end": ["抓到小老鼠啦", "我是捕鼠小能手"],
+	},
+}
+
+func _new_action(kind: String) -> int:
+	_action_id += 1
+	action_kind = kind
+	return _action_id
+
+func _spawn_prop(n: Node3D) -> void:
+	var parent := get_parent()
+	if parent == null:
+		parent = get_tree().root
+	parent.add_child(n)
+	_props.append(n)
+
+func _clear_props() -> void:
+	for n in _props:
+		if is_instance_valid(n):
+			n.queue_free()
+	_props.clear()
+
+func _pop_in(n: Node3D, dur := 0.35) -> void:
+	n.scale = Vector3.ONE * 0.01
+	var tw := create_tween()
+	tw.tween_property(n, "scale", Vector3.ONE, dur).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _pop_out_free(n: Node3D, dur := 0.25) -> void:
+	if not is_instance_valid(n):
+		return
+	var tw := create_tween()
+	tw.tween_property(n, "scale", Vector3.ONE * 0.01, dur).set_trans(Tween.TRANS_SINE)
+	tw.tween_callback(n.queue_free)
+
+func _inside_obstacle(p: Vector3, margin := 0.0) -> bool:
+	for o in OBSTACLES:
+		if Vector2(p.x, p.z).distance_to(Vector2(o.x, o.y)) < o.z + margin:
+			return true
+	return false
+
+func _push_out_of_obstacles(p: Vector3) -> Vector3:
+	for o in OBSTACLES:
+		var c := Vector2(o.x, o.y)
+		var d := Vector2(p.x, p.z) - c
+		var r: float = o.z * 0.85
+		if d.length() < r:
+			var n := d.normalized() if d.length() > 0.001 else Vector2(0, 1)
+			var q := c + n * r
+			p.x = q.x
+			p.z = q.y
+	return p
+
+func _clamp_floor(p: Vector3) -> Vector3:
+	p.x = clampf(p.x, FLOOR_MIN.x, FLOOR_MAX.x)
+	p.z = clampf(p.z, FLOOR_MIN.z, FLOOR_MAX.z)
+	p.y = _home_y
+	return p
+
+func _in_floor(p: Vector3) -> bool:
+	return p.x >= FLOOR_MIN.x and p.x <= FLOOR_MAX.x and p.z >= FLOOR_MIN.z and p.z <= FLOOR_MAX.z
+
+func _clip_for(name: String) -> String:
+	if anim and anim.has_animation(name):
+		return name
+	if name == "run" and anim and anim.has_animation("walk"):
+		return "walk"
+	return _idle_clip
+
+var _loco_clip := ""
+func _loco(name: String) -> void:
+	var c := _clip_for(name)
+	if anim == null:
+		return
+	if anim.current_animation != c or not anim.is_playing():
+		anim.play(c)
+	_loco_clip = c
+
+func _turn_toward(dir: Vector3, delta: float, speed := TURN_SPEED) -> void:
+	if dir.length_squared() < 0.0001:
+		return
+	rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z), clampf(speed * delta, 0.0, 1.0))
+
+func _facing() -> Vector3:
+	return Vector3(sin(rotation.y), 0.0, cos(rotation.y))
+
+## Walk (or run) the cat to `target`. Returns false if the action was cancelled.
+func _walk_to(target: Vector3, token: int, clip := "walk", speed := WALK_SPEED) -> bool:
+	_loco(clip)
+	var guard := 0.0
+	while true:
+		await get_tree().process_frame
+		if token != _action_id:
+			return false
+		var delta := get_process_delta_time()
+		guard += delta
+		var flat := Vector3(position.x, _home_y, position.z)
+		var to := Vector3(target.x, _home_y, target.z) - flat
+		var dist := to.length()
+		if dist < 0.05 or guard > 12.0:
+			return true
+		var dir := to / dist
+		_turn_toward(dir, delta)
+		position = _clamp_floor(_push_out_of_obstacles(flat + dir * minf(speed * delta, dist)))
+	return true
+
+func _wait(sec: float, token: int) -> bool:
+	var t := 0.0
+	while t < sec:
+		await get_tree().process_frame
+		if token != _action_id:
+			return false
+		t += get_process_delta_time()
+	return true
+
+func _pick_food_spot() -> Array:
+	# Returns [bowl_position, cat_stop_position]. The cat walks ~0.6-0.9 and stops EAT_REACH short.
+	# Prefer bowls toward the camera / sideways so the meal is easy to watch.
+	var best: Array = []
+	var best_score := -99.0
+	for i in 120:
+		var ang := _rng.randf_range(-PI, PI)
+		var r := _rng.randf_range(1.25, 1.55)
+		var dir := Vector3(sin(ang), 0.0, cos(ang))
+		# Never send the cat away from the camera: we want to see the bowl and her face.
+		if dir.z < -0.35 and i < 90:
+			continue
+		var stop := Vector3(position.x, _home_y, position.z) + dir * (r - EAT_REACH)
+		var bowl := Vector3(position.x, 0.0, position.z) + dir * r
+		if not _in_floor(stop) or bowl.z > 1.45 or absf(bowl.x) > 2.2 or _inside_obstacle(stop, 0.1) or _inside_obstacle(bowl, -0.1):
+			continue
+		if _segment_hits_obstacle(position, stop):
+			continue
+		var score := absf(dir.x) + dir.z * 0.25 + _rng.randf() * 0.3
+		if score > best_score:
+			best_score = score
+			best = [bowl, stop]
+	if not best.is_empty():
+		return best
+	var d := _facing()
+	var st := _clamp_floor(position - d * 0.4)
+	return [st + d * EAT_REACH, st]
+
+func _run_feed(food_id: String) -> void:
+	var token := _new_action("feed")
+	_cancel_autonomy_force()
+	_cooldown = 999.0
+	var spec: Dictionary = CatProps.FOODS[food_id]
+	var lines: Dictionary = FOOD_LINES[food_id]
+	var spot := _pick_food_spot()
+	var bowl: Vector3 = spot[0]
+	var stop: Vector3 = spot[1]
+	var food := CatProps.make_food(food_id)
+	action_anchor = bowl
+	has_anchor = true
+	food.position = bowl
+	_spawn_prop(food)
+	_pop_in(food)
+	action_phase = "walk"
+	_say(_pick(lines["start"]), true)
+	if not await _walk_to(stop, token):
+		return
+	# Face the bowl, then eat.
+	action_phase = "eat"
+	var want := atan2(bowl.x - position.x, bowl.z - position.z)
+	var tw := create_tween()
+	tw.tween_property(self, "rotation:y", rotation.y + wrapf(want - rotation.y, -PI, PI), 0.25).set_trans(Tween.TRANS_SINE)
+	if not await _wait(0.3, token):
+		return
+	stats.feed_with(float(spec["hunger"]), float(spec["mood"]))
+	_say(_pick(lines["eat"]), true)
+	_play_sfx(_sfx_feed)
+	var eat_clip := _clip_for(CLIP_FEED)
+	var eat_len := 1.2
+	if anim and anim.has_animation(eat_clip):
+		eat_len = maxf(anim.get_animation(eat_clip).length, 0.8)
+	var content := food.get_node_or_null("Content") as Node3D
+	var total := eat_len * 2.0
+	if content:
+		var sh := create_tween()
+		sh.tween_property(content, "scale", Vector3(0.75, 0.04, 0.75), total * 0.95).set_trans(Tween.TRANS_SINE)
+	for rep in 2:
+		if anim:
+			anim.play(eat_clip)
+		if not await _wait(eat_len, token):
+			return
+	_pop_out_free(food)
+	_finish_action("feed")
+
+func _finish_action(kind: String) -> void:
+	has_anchor = false
+	action_phase = ""
+	action_kind = ""
+	_loco_clip = ""
+	_idle_clip = CLIP_IDLE
+	_play_idle()
+	_face_front(0.3, 0.2)
+	_auto_timer = _rng.randf_range(2.5, 4.5)
+	_cooldown = 0.5
+	_props.clear()
+	_apply_cosmetics_for_bond(stats.bond)
+	save_requested.emit()
+	action_finished.emit(kind)
+
+func _cancel_autonomy_force() -> void:
+	var saved := action_phase
+	action_phase = ""
+	_cancel_autonomy()
+	action_phase = saved
+
+func _run_play(toy_id: String) -> void:
+	var token := _new_action("play")
+	_cancel_autonomy_force()
+	_cooldown = 999.0
+	var spec: Dictionary = CatProps.TOYS[toy_id]
+	var lines: Dictionary = TOY_LINES[toy_id]
+	var toy := CatProps.make_toy(toy_id)
+	_spawn_prop(toy)
+	_pop_in(toy)
+	action_phase = toy_id
+	stats.play_with(float(spec["mood"]), float(spec["bond"]), float(spec["hunger"]))
+	_play_sfx(_sfx_play)
+	_say(_pick(lines["start"]), true)
+	var ok := true
+	if toy_id == "wand":
+		ok = await _play_wand(toy, token)
+	else:
+		ok = await _play_chase(toy_id, toy, token)
+	if not ok:
+		return
+	_say(_pick(lines["end"]), true)
+	_pop_out_free(toy)
+	_finish_action("play")
+
+func _pounce(clip: String, token: int) -> bool:
+	var c := _clip_for(clip)
+	if anim:
+		anim.play(c)
+	var len := anim.get_animation(c).length if anim and anim.has_animation(c) else 0.8
+	return await _wait(clampf(len, 0.5, 1.4), token)
+
+func _play_wand(toy: Node3D, token: int) -> bool:
+	# Feather swishes in front of the cat; the cat sits, tracks it, and pounces twice.
+	var base := Vector3(position.x, 0.0, position.z)
+	var fwd := _facing()
+	if fwd.z < 0.2:
+		fwd = Vector3(sin(0.0), 0.0, 1.0)
+	var centre := base + fwd * 0.75
+	var rod: Node3D = toy.get_node("Rod")
+	rod.basis = Basis.looking_at(-Vector3(0.45, 0.7, 1.0).normalized(), Vector3.UP)
+	var t := 0.0
+	var pounce_at := [1.5, 3.2]
+	var next := 0
+	var dur := 5.0
+	_loco(CLIP_IDLE)
+	while t < dur:
+		await get_tree().process_frame
+		if token != _action_id:
+			return false
+		var delta := get_process_delta_time()
+		t += delta
+		var dip := 0.0
+		if next < pounce_at.size() and t >= pounce_at[next]:
+			next += 1
+			_pounce_async(next == 1, token)
+		# wand dips low near each pounce time
+		for pa in pounce_at:
+			dip = maxf(dip, clampf(1.0 - absf(t - pa - 0.15) / 0.5, 0.0, 1.0))
+		var p := centre + Vector3(sin(t * 2.3) * 0.5, 0.0, cos(t * 1.6) * 0.22)
+		p.y = lerpf(0.55 + 0.12 * sin(t * 4.6), 0.2, dip)
+		toy.position = p
+		action_anchor = p
+		has_anchor = true
+		var tip := toy.get_node("Tip") as Node3D
+		tip.rotation.z = sin(t * 7.0) * 0.35
+		_turn_toward(Vector3(p.x - position.x, 0.0, p.z - position.z), delta, 4.0)
+	_loco(CLIP_IDLE)
+	return true
+
+func _pounce_async(first: bool, token: int) -> void:
+	await _pounce("jump" if first else "attack", token)
+	if token == _action_id and action_phase != "":
+		_loco(CLIP_IDLE)
+
+func _make_waypoints(count: int, start: Vector3, min_step: float) -> Array:
+	# Mostly sideways hops so the chase stays in profile for the camera.
+	var pts: Array = []
+	var prev := start
+	var side := -1.0 if start.x > 0.0 else 1.0
+	for i in count:
+		var best := prev
+		for k in 40:
+			var q := prev + Vector3(side * _rng.randf_range(min_step, min_step + 0.7), 0.0, _rng.randf_range(-0.45, 0.45))
+			if not _in_floor(q) or _inside_obstacle(q, 0.05):
+				side = -side
+				continue
+			best = q
+			break
+		pts.append(best)
+		prev = best
+		side = -side if _rng.randf() < 0.75 else side
+	return pts
+
+func _play_chase(toy_id: String, toy: Node3D, token: int) -> bool:
+	var cfg: Dictionary = {
+		"yarn": {"n": 3, "speed": 1.5, "pause": 0.7, "cat": 1.5, "step": 1.4},
+		"mouse": {"n": 5, "speed": 1.7, "pause": 0.0, "cat": RUN_SPEED, "step": 1.0},
+		"laser": {"n": 6, "speed": 2.3, "pause": 0.0, "cat": 2.2, "step": 1.0},
+	}[toy_id]
+	var fwd := _facing()
+	var lat := Vector3(-1.0 if position.x > 0.0 else 1.0, 0.0, 0.25)
+	var start := _clamp_floor(Vector3(position.x, 0.0, position.z) + lat.normalized() * 1.1)
+	if _inside_obstacle(start, 0.05):
+		start = _clamp_floor(Vector3(position.x, 0.0, position.z) + fwd * 1.1)
+	toy.position = Vector3(start.x, 0.0, start.z)
+	var pts := _make_waypoints(int(cfg["n"]), start, float(cfg["step"]))
+	var idx := 0
+	var pause := 0.0
+	_pounce_cd = 0.0
+	_pouncing = false
+	var done_t := 0.0
+	var elapsed := 0.0
+	var spin := toy.get_node_or_null("Spin") as Node3D
+	var finished_path := false
+	while true:
+		await get_tree().process_frame
+		if token != _action_id:
+			return false
+		var delta := get_process_delta_time()
+		elapsed += delta
+		_pounce_cd -= delta
+		# --- toy motion
+		var moving := false
+		if not finished_path:
+			if pause > 0.0:
+				pause -= delta
+			else:
+				var target: Vector3 = pts[idx]
+				var to := Vector3(target.x - toy.position.x, 0.0, target.z - toy.position.z)
+				var d := to.length()
+				if d < 0.05:
+					idx += 1
+					pause = float(cfg["pause"])
+					if idx >= pts.size():
+						finished_path = true
+				else:
+					var step := minf(float(cfg["speed"]) * delta, d)
+					var dir := to / d
+					toy.position += dir * step
+					moving = true
+					if toy_id == "mouse":
+						toy.rotation.y = lerp_angle(toy.rotation.y, atan2(-dir.z, dir.x), clampf(14.0 * delta, 0.0, 1.0))
+						toy.position.y = absf(sin(elapsed * 22.0)) * 0.015
+					elif toy_id == "yarn" and spin:
+						spin.rotate(Vector3(dir.z, 0.0, -dir.x).normalized(), step / 0.11)
+					elif toy_id == "laser":
+						toy.position.y = 0.0
+		action_anchor = toy.position
+		has_anchor = true
+		# --- cat chase
+		var tp := Vector3(toy.position.x, _home_y, toy.position.z)
+		var cp := Vector3(position.x, _home_y, position.z)
+		var dv := tp - cp
+		var dist := dv.length()
+		if not _pouncing:
+			if dist > CHASE_STOP:
+				var dirc := dv / dist
+				_loco("run")
+				_turn_toward(dirc, delta, 10.0)
+				position = _clamp_floor(_push_out_of_obstacles(cp + dirc * minf(float(cfg["cat"]) * delta, dist - CHASE_STOP * 0.9)))
+			else:
+				_turn_toward(dv, delta, 10.0)
+				if toy_id != "laser" and (toy_id == "mouse" or not moving or finished_path) and _pounce_cd <= 0.0:
+					_pouncing = true
+					_pounce_chase(token, toy_id)
+				elif moving:
+					_loco("walk")
+					position = _clamp_floor(_push_out_of_obstacles(cp + dv.normalized() * minf(float(cfg["speed"]) * delta, maxf(dist - CHASE_STOP * 0.9, 0.0))))
+				else:
+					_loco(CLIP_IDLE)
+		if finished_path:
+			done_t += delta
+			if toy_id == "laser" and done_t > 0.8:
+				_loco("idle_alt" if anim and anim.has_animation("idle_alt") else CLIP_IDLE)
+				toy.visible = false
+				return await _wait(1.0, token)
+			if toy_id != "laser" and done_t > 2.2:
+				return true
+			if elapsed > 14.0:
+				return true
+		if elapsed > 16.0:
+			return true
+	return true
+
+var _pouncing := false
+var _pounce_cd := 0.0
+
+func _pounce_chase(token: int, toy_id: String) -> void:
+	await _pounce("attack" if toy_id == "yarn" else "jump", token)
+	if token != _action_id:
+		return
+	_pouncing = false
+	_pounce_cd = 1.2
+	_loco(CLIP_IDLE)

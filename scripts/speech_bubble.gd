@@ -178,6 +178,9 @@ func _update_follow() -> void:
 	if not placed:
 		left = tip.x - bw * 0.5
 		top = tip.y + head_r * 0.55 + 14.0
+		# While eating the mouth is on the bowl: keep the bubble above the cat instead.
+		if str(_cat.get("action_phase")) == "eat":
+			top = tip.y - head_r * 2.4 - bh
 	left = clampf(left, margin, maxf(margin, vp.x - bw - margin))
 	top = clampf(top, margin, maxf(margin, vp.y - bh - margin))
 	position = Vector2(left, top)
