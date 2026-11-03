@@ -14,34 +14,37 @@ func _run() -> void:
 	var stats: Node = main.get_node("%PetStats")
 	var label: Label = main.get_node("%FeedbackLabel")
 	var body: Node3D = main.get_node("%CatBody")
-	var anim: AnimationPlayer = main.get_node("%CatAnim")
 	assert(body != null)
-	assert(body.find_child("TabbyModel", true, false) != null or body.get_child_count() > 0)
-	assert(anim != null)
-	# Wait one more frame so Cat._ready built the animation library.
+	assert(body.find_child("CuteCatModel", true, false) != null or body.get_child_count() > 0)
+	var anim: AnimationPlayer = body.find_child("AnimationPlayer", true, false)
+	assert(anim != null, "rigged cat AnimationPlayer missing")
 	await process_frame
-	assert(anim.has_animation("idle"))
-	assert(anim.has_animation("pet"))
-	assert(anim.has_animation("feed"))
-	assert(anim.has_animation("play"))
+	assert(anim.has_animation("sit") or anim.has_animation("idle"))
+	assert(anim.has_animation("call") or anim.has_animation("idle_alt"))
+	assert(anim.has_animation("eat"))
+	assert(anim.has_animation("jump") or anim.has_animation("attack"))
 
 	var mood0: float = stats.mood
 	cat.do_pet()
 	assert(stats.mood > mood0)
 	assert(label.text.find("呼噜") >= 0)
-	assert(anim.current_animation == "pet" or anim.current_animation == "idle")
+	assert(String(anim.current_animation) in ["call", "sit", "idle", "idle_alt"])
 
-	await create_timer(1.0).timeout
+	await process_frame
+	cat._cooldown = 0.0
 	var hunger0: float = stats.hunger
 	cat.do_feed()
 	assert(stats.hunger < hunger0)
 	assert(label.text.find("好吃") >= 0)
+	assert(String(anim.current_animation) in ["eat", "sit", "idle"])
 
-	await create_timer(1.0).timeout
+	await process_frame
+	cat._cooldown = 0.0
 	var bond0: float = stats.bond
 	cat.do_play()
 	assert(stats.bond > bond0)
 	assert(label.text.find("逗") >= 0)
+	assert(String(anim.current_animation) in ["jump", "attack", "sit", "idle"])
 
-	print("smoke_main ok feedback=", label.text, " mood=", stats.mood, " hunger=", stats.hunger, " bond=", stats.bond, " anim=", anim.current_animation)
+	print("smoke_main ok feedback=", label.text, " mood=", stats.mood, " hunger=", stats.hunger, " bond=", stats.bond, " anim=", anim.current_animation, " idle=", cat._idle_clip)
 	quit(0)

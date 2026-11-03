@@ -1,6 +1,6 @@
 # 治愈猫 · Godot 4.7 原型
 
-送礼向轻养成电子宠物猫（偏写实萌宠 3D（Grab3D 虎斑猫））。第一版：一只猫、一个小房间、摸摸 / 喂食 / 逗逗，无死亡惩罚。
+送礼向轻养成电子宠物猫（偏可爱玩具写实感 3D（Vuena 绑定猫 + 骨骼动画））。第一版：一只猫、一个小房间、摸摸 / 喂食 / 逗逗，无死亡惩罚。
 
 ## 环境
 
@@ -28,9 +28,9 @@
 
 ## 怎么玩
 
-1. 进入温馨小房间，中间是写实虎斑猫模型（CC0，手机优化约 4.6 万三角）。
+1. 进入温馨小房间，中间是绑定猫模型（CC0，约 7.2k 三角，含 sit/eat/jump 等骨骼动画）。
 2. 点底部 **摸摸 / 喂食 / 逗逗**：
-   - 摸摸：心情↑、亲密↑，旁白「呼噜～再摸摸」，猫轻微弹跳
+   - 摸摸：心情↑、亲密↑，旁白「呼噜～再摸摸」，猫播 call 动画（叫唤/反应）
    - 喂食：饥饿↓、心情↑，「喵，好吃！」
    - 逗逗：心情↑、亲密↑、略饿，「逗我！还要～」
 3. 右上角柔和进度条：心情 / 饥饿 / 亲密（0–100）。
@@ -42,11 +42,11 @@
 | 路径 | 作用 |
 |------|------|
 | `project.godot` | 项目名「治愈猫」，主场景 `scenes/main.tscn`，Mobile 渲染 |
-| `scenes/main.tscn` | 房间 + 虎斑猫 + 相机灯光 + UI |
-| `assets/models/tabby_cat_mobile.glb` | Grab3D Tabby Cat 轻量简化版（游戏内） |
+| `scenes/main.tscn` | 房间 + 绑定猫 + 相机灯光 + UI |
+| `assets/models/cute_cat_rigged.glb` | Vuena 绑定猫（LOD0，骨骼动画） |
 | `assets/models/CAT_LICENSE.txt` | CC0 许可与来源说明 |
 | `scripts/pet_stats.gd` | mood / hunger / bond |
-| `scripts/cat_controller.gd` | 摸喂逗、冷却、弹跳、旁白 |
+| `scripts/cat_controller.gd` | 摸喂逗、冷却、骨骼动画映射、旁白 |
 | `scripts/main_ui.gd` | 按钮与进度条绑定 |
 | `docs/superpowers/specs/2026-11-03-cute-cat-pet-design.md` | 设计规格 |
 | `docs/superpowers/plans/2026-11-03-cute-cat-pet-prototype.md` | 实现计划 |
@@ -54,10 +54,15 @@
 
 ## 3D 猫模型
 
-- **来源**：[Grab3D Tabby Cat](https://grab3d.com/models/animals/cat/)（`cat-light.glb`）
-- **许可**：CC0 1.0（详见 `assets/models/CAT_LICENSE.txt`）
-- **游戏内**：`tabby_cat_mobile.glb`（gltf-transform 简化，约 46k tris / 1.7MB）
-- **动画**：原模无骨骼动画；`CatAnim` 用缩放/旋转/位移做 idle / pet / feed / play。骨骼级动作需后续换带动画的模型。
+- **来源**：[Vuena Cute Pets FREE Sample](https://vuena.itch.io/blocky-pets-free)（Popyca / designer-toy cat）
+- **许可**：CC0 1.0（详见 `assets/models/CAT_LICENSE.txt`；署名非必须）
+- **游戏内**：`cute_cat_rigged.glb`（albedo 1024²，仅 LOD0；约 **7,188** 三角 / ~0.66MB）
+- **骨骼动画映射**：
+  - 默认 idle 循环 → `sit`
+  - 摸摸 → `call`
+  - 喂食 → `eat`
+  - 逗逗 → `jump`
+- **风格说明**：比原先 Grab3D 虎斑更偏「可爱玩具」而非照片级写实，但带完整绑定与坐/吃/跳，适合送礼向安卓原型。旧 `tabby_cat_mobile.glb` 仍留在仓库作对照。
 
 ## Android 导出备注（尚未正式导出 APK）
 
@@ -73,8 +78,8 @@
 
 ## 验收清单（原型）
 
-- [x] 打开主场景可见房间与写实虎斑猫
+- [x] 打开主场景可见房间与绑定猫
 - [x] 三个中文按钮可点，数值按设计变化
-- [x] 可见柔和动画反馈（摸摸/喂食/逗逗）+ 中文旁白
+- [x] 可见骨骼动画反馈（call/eat/jump）+ 中文旁白
 - [x] hunger/mood 随时间缓慢变化
 - [x] Godot 4.7.2 无头加载无脚本错误

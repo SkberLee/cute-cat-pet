@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/cat_controller.gd" id="1_cat"]
 [ext_resource type="Script" path="res://scripts/pet_stats.gd" id="2_stats"]
 [ext_resource type="Script" path="res://scripts/main_ui.gd" id="3_ui"]
-[ext_resource type="PackedScene" uid="uid://c55qij6a6a1e7" path="res://assets/models/tabby_cat_mobile.glb" id="4_catmdl"]
+[ext_resource type="PackedScene" uid="uid://lwgpxcu2y7fk" path="res://assets/models/cute_cat_rigged.glb" id="4_catmdl"]
 
 [sub_resource type="StandardMaterial3D" id="MatFloor"]
 albedo_color = Color(0.92, 0.82, 0.78, 1)
@@ -29,7 +29,7 @@ shadow_enabled = true
 light_energy = 1.1
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.939693, 0.34202, 0, -0.34202, 0.939693, 0, 1.35, 2.6)
+transform = Transform3D(1, 0, 0, 0, 0.939693, 0.34202, 0, -0.34202, 0.939693, 0, 1.55, 2.9)
 current = true
 fov = 50.0
 
@@ -68,12 +68,8 @@ script = ExtResource("1_cat")
 [node name="CatBody" type="Node3D" parent="Cat"]
 unique_name_in_owner = true
 
-[node name="TabbyModel" parent="Cat/CatBody" instance=ExtResource("4_catmdl")]
-transform = Transform3D(-1.35, 0, 0, 0, 1.35, 0, 0, 0, -1.35, 0, 0, 0)
-
-[node name="CatAnim" type="AnimationPlayer" parent="Cat"]
-unique_name_in_owner = true
-root_node = NodePath("..")
+[node name="CuteCatModel" parent="Cat/CatBody" instance=ExtResource("4_catmdl")]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0)
 
 [node name="PetStats" type="Node" parent="Cat"]
 unique_name_in_owner = true

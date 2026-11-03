@@ -1,29 +1,36 @@
-Tabby Cat (Grab3D) — CC0 1.0 Universal (Public Domain Dedication)
+Cute Cat (rigged) — Vuena / Popyca "Cute Pets & Wildlife FREE Sample" — CC0 1.0
 
-Source page: https://grab3d.com/models/animals/cat/
-Download used: https://grab3d.com/dl/cat/cat-light.glb (Light tier)
-In-game file: assets/models/tabby_cat_mobile.glb
-  (gltf-transform simplify from cat-light.glb → ~46k tris for mobile)
+Source: https://vuena.itch.io/blocky-pets-free
+Archive used: Cute-Pets-Wildlife-FREE-Sample-CC0.zip (v3 designer-toy sample)
+In-game file: assets/models/cute_cat_rigged.glb
+  - Derived from GLB/animal_cat.glb
+  - Albedo resized to 1024² for mobile; LOD1 mesh node stripped so only LOD0 draws
+  - Polycount: ~7,188 triangles (LOD0). Original pack also includes LOD1 (~2,452 tris).
 
-Original Grab3D LICENSE text:
+Animations (skeletal, in-place): idle, idle_alt, walk, run, jump, eat, sit, sleep,
+attack, call, hit, death.
+
+Mapping in 治愈猫:
+  sit   -> default room idle loop
+  call  -> 摸摸 (pet)
+  eat   -> 喂食 (feed)
+  jump  -> 逗逗 (play / soft pounce)
+
+License (from pack LICENSE.txt):
 ---
-CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+Cute Pets & Wildlife FREE Sample - CC0 1.0 Universal (Public Domain Dedication)
 
-To the extent possible under law, Grab3D has waived all copyright and related or neighboring rights to the
-3D models, textures and images in this package. This work is published from: Germany.
+To the extent possible under law, Popyca has waived all copyright and related or
+neighbouring rights to the 3D models, animations and textures in this sample
+(cat, fox, owl). You can copy, modify, distribute and use the work, even for
+commercial purposes, all without asking permission and without attribution.
+Full legal text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
 
-https://creativecommons.org/publicdomain/zero/1.0/legalcode
-
-Origin / AI disclosure
-----------------------
-Method: AI-assisted (contains AI-generated content)
-Base mesh and textures generated with an AI image-to-3D tool (Meshy), then cleaned up, scaled, textured and
-checked in Blender.
-If your platform requires disclosure of AI-generated content (for example Steam), this asset counts as
-AI-assisted.
+This waiver applies only to the files in this sample archive. The full pack
+"Cute Pets & Wildlife" is licensed separately.
 ---
 
-Notes for 治愈猫:
-- Static pose / no skeletal rig or embedded animations.
-- Soft idle / pet / feed / play motions are procedural AnimationPlayer tracks on CatBody.
-- Attribution not required under CC0; retained here for provenance.
+Attribution not required under CC0; retained here for provenance.
+
+Previous static Grab3D tabby (tabby_cat_mobile.glb) remains in assets for reference
+but is no longer the gameplay model. See historical notes in git history / README.
