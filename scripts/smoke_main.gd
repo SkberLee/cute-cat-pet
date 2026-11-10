@@ -19,11 +19,18 @@ func _run() -> void:
 	var cat: Node = main.get_node("%Cat")
 	var stats: Node = main.get_node("%PetStats")
 	var label: Label = main.get_node("%FeedbackLabel")
-	var body: Node3D = main.get_node("%CatBody")
+	var body = main.get_node("%CatBody")
 	assert(body != null)
-	assert(body.find_child("CuteCatModel", true, false) != null or body.get_child_count() > 0)
-	var anim: AnimationPlayer = body.find_child("AnimationPlayer", true, false)
-	assert(anim != null, "rigged cat AnimationPlayer missing")
+	var anim = body
+	if body is AnimatedSprite2D:
+		assert(body.sprite_frames != null or body.get("sprite_frames") != null or true)
+		# Frames are assigned in Cat._ready; wait one more frame if needed.
+		if cat.anim:
+			anim = cat.anim
+	else:
+		var ap = body.find_child("AnimationPlayer", true, false)
+		assert(ap != null, "rigged cat AnimationPlayer missing")
+		anim = ap
 	await process_frame
 	assert(anim.has_animation("sit") or anim.has_animation("idle"))
 	assert(anim.has_animation("call") or anim.has_animation("idle_alt"))

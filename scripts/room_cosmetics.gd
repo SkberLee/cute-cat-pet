@@ -40,10 +40,10 @@ const THEMES := {
 	},
 }
 
-@onready var rug: CSGPrimitive3D = %Rug
-@onready var cushion: CSGPrimitive3D = %Cushion
-@onready var curtain: CSGPrimitive3D = %Curtain
-@onready var wall_back: CSGPrimitive3D = %WallBack
+@onready var rug: CanvasItem = %Rug
+@onready var cushion: CanvasItem = %Cushion
+@onready var curtain: CanvasItem = %Curtain
+@onready var wall_back: CanvasItem = %WallBack
 
 var current_theme: String = "blush"
 
@@ -67,10 +67,10 @@ func apply_theme(id: String, emit_signal: bool = true) -> void:
 		id = "blush"
 	current_theme = id
 	var t: Dictionary = THEMES[id]
-	_set_albedo(rug, t["rug"])
-	_set_albedo(cushion, t["cushion"])
-	_set_albedo(curtain, t["curtain"])
-	_set_albedo(wall_back, t["wall"])
+	_set_tint(rug, t["rug"])
+	_set_tint(cushion, t["cushion"])
+	_set_tint(curtain, t["curtain"])
+	_set_tint(wall_back, t["wall"])
 	if emit_signal:
 		theme_changed.emit(current_theme)
 
@@ -86,16 +86,13 @@ func cycle_next(bond: float) -> String:
 	apply_theme(ids[idx])
 	return current_theme
 
-func _set_albedo(node: CSGPrimitive3D, color: Color) -> void:
+func _set_tint(node: CanvasItem, color: Color) -> void:
 	if node == null:
 		return
-	var mat = node.material
-	if mat is StandardMaterial3D:
-		var dup: StandardMaterial3D = (mat as StandardMaterial3D).duplicate()
-		dup.albedo_color = color
-		node.material = dup
-	else:
-		var m := StandardMaterial3D.new()
-		m.albedo_color = color
-		m.roughness = 1.0
-		node.material = m
+	# Multiply the pixel art by a soft theme tint (keep luminance).
+	node.modulate = Color(
+		clampf((color.r + 0.35) / 1.15, 0.55, 1.2),
+		clampf((color.g + 0.35) / 1.15, 0.55, 1.2),
+		clampf((color.b + 0.35) / 1.15, 0.55, 1.2),
+		1.0
+	)

@@ -1,0 +1,451 @@
+[gd_scene load_steps=19 format=3 uid="uid://cute_cat_main"]
+
+[ext_resource type="Script" path="res://scripts/legacy_3d/cat_controller.gd" id="1_cat"]
+[ext_resource type="Script" path="res://scripts/pet_stats.gd" id="2_stats"]
+[ext_resource type="Script" path="res://scripts/legacy_3d/main_ui.gd" id="3_ui"]
+[ext_resource type="PackedScene" uid="uid://lwgpxcu2y7fk" path="res://assets/models/cute_cat_rigged.glb" id="4_catmdl"]
+[ext_resource type="Script" path="res://scripts/legacy_3d/room_cosmetics.gd" id="5_room"]
+[ext_resource type="Script" path="res://scripts/legacy_3d/speech_bubble.gd" id="6_bubble"]
+
+[sub_resource type="StandardMaterial3D" id="MatFloor"]
+albedo_color = Color(0.78, 0.62, 0.5, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="MatWall"]
+albedo_color = Color(0.97, 0.92, 0.9, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="MatWallAccent"]
+albedo_color = Color(0.94, 0.86, 0.84, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="MatRug"]
+albedo_color = Color(0.93, 0.72, 0.74, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="MatWood"]
+albedo_color = Color(0.62, 0.42, 0.32, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="MatCushion"]
+albedo_color = Color(0.86, 0.78, 0.92, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="MatBowl"]
+albedo_color = Color(0.95, 0.88, 0.78, 1)
+roughness = 0.4
+
+[sub_resource type="StandardMaterial3D" id="MatPlant"]
+albedo_color = Color(0.42, 0.62, 0.45, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="MatPot"]
+albedo_color = Color(0.72, 0.55, 0.48, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="MatWindowGlow"]
+albedo_color = Color(1, 0.95, 0.85, 1)
+emission_enabled = true
+emission = Color(1, 0.92, 0.78, 1)
+emission_energy_multiplier = 2.2
+roughness = 0.2
+
+[sub_resource type="StandardMaterial3D" id="MatFrame"]
+albedo_color = Color(0.85, 0.78, 0.7, 1)
+roughness = 0.6
+
+[sub_resource type="StandardMaterial3D" id="MatCurtain"]
+albedo_color = Color(0.95, 0.78, 0.82, 1)
+roughness = 0.95
+
+[sub_resource type="Environment" id="Environment_room"]
+background_mode = 1
+background_color = Color(0.9, 0.82, 0.78, 1)
+ambient_light_source = 2
+ambient_light_color = Color(1, 0.9, 0.86, 1)
+ambient_light_energy = 0.62
+tonemap_mode = 2
+glow_enabled = true
+glow_intensity = 0.35
+glow_strength = 0.7
+glow_bloom = 0.08
+
+[node name="Main" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_room")
+
+[node name="SunLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 2, 4, 3)
+light_color = Color(1, 0.95, 0.88, 1)
+light_energy = 0.85
+shadow_enabled = true
+
+[node name="WindowFill" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2, 1.55, -2.1)
+light_color = Color(1, 0.9, 0.75, 1)
+light_energy = 1.35
+omni_range = 5.5
+omni_attenuation = 1.2
+
+[node name="WarmLamp" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 1.2, 0.4)
+light_color = Color(1, 0.72, 0.62, 1)
+light_energy = 0.55
+omni_range = 3.2
+omni_attenuation = 1.4
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.939693, 0.34202, 0, -0.34202, 0.939693, 0, 1.42, 2.75)
+current = true
+fov = 40.0
+keep_aspect = 1
+
+[node name="Room" type="Node3D" parent="."]
+
+[node name="Floor" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 1.9)
+size = Vector3(6.2, 0.1, 9.0)
+material = SubResource("MatFloor")
+
+[node name="WallBack" type="CSGBox3D" parent="Room"]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, -2.55)
+size = Vector3(6.2, 2.8, 0.12)
+material = SubResource("MatWall")
+
+[node name="WallLeft" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.1, 1.35, 1.9)
+size = Vector3(0.12, 2.8, 9.0)
+material = SubResource("MatWallAccent")
+
+[node name="WallRight" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 1.35, 1.9)
+size = Vector3(0.12, 2.8, 9.0)
+material = SubResource("MatWall")
+
+[node name="BaseboardBack" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, -2.48)
+size = Vector3(6.0, 0.16, 0.06)
+material = SubResource("MatWood")
+
+[node name="Rug" type="CSGCylinder3D" parent="Room"]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.006, 0.25)
+radius = 1.25
+height = 0.012
+material = SubResource("MatRug")
+
+[node name="WindowFrame" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, 1.55, -2.48)
+size = Vector3(1.7, 1.35, 0.08)
+material = SubResource("MatFrame")
+
+[node name="WindowGlow" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, 1.55, -2.43)
+size = Vector3(1.4, 1.1, 0.04)
+material = SubResource("MatWindowGlow")
+
+[node name="WindowSill" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, 0.82, -2.28)
+size = Vector3(1.75, 0.08, 0.35)
+material = SubResource("MatWood")
+
+[node name="Curtain" type="CSGBox3D" parent="Room"]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.55, 1.35, -2.15)
+size = Vector3(0.85, 1.6, 0.06)
+material = SubResource("MatCurtain")
+
+[node name="Cushion" type="CSGCylinder3D" parent="Room"]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.55, 0.12, -0.9)
+radius = 0.55
+height = 0.18
+material = SubResource("MatCushion")
+
+[node name="SideTable" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7, 0.28, 0.55)
+size = Vector3(0.7, 0.5, 0.55)
+material = SubResource("MatWood")
+
+[node name="LampShade" type="CSGCylinder3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7, 0.85, 0.55)
+radius = 0.22
+height = 0.28
+material = SubResource("MatCushion")
+
+[node name="LampStem" type="CSGCylinder3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7, 0.6, 0.55)
+radius = 0.03
+height = 0.28
+material = SubResource("MatWood")
+
+[node name="FoodBowl" type="CSGCylinder3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, 0.06, 0.55)
+radius = 0.18
+height = 0.08
+material = SubResource("MatBowl")
+
+[node name="PlantPot" type="CSGCylinder3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.85, 0.18, -1.7)
+radius = 0.2
+height = 0.32
+material = SubResource("MatPot")
+
+[node name="PlantLeaves" type="CSGSphere3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.85, 0.55, -1.7)
+radius = 0.32
+material = SubResource("MatPlant")
+
+[node name="Shelf" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.55, 1.15, -1.4)
+size = Vector3(0.7, 0.08, 0.9)
+material = SubResource("MatWood")
+
+[node name="ShelfBook" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.55, 1.3, -1.55)
+size = Vector3(0.35, 0.28, 0.12)
+material = SubResource("MatCushion")
+
+[node name="Cat" type="Node3D" parent="."]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.35)
+script = ExtResource("1_cat")
+
+[node name="CatBody" type="Node3D" parent="Cat"]
+unique_name_in_owner = true
+
+[node name="CuteCatModel" parent="Cat/CatBody" instance=ExtResource("4_catmdl")]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0)
+
+[node name="PetStats" type="Node" parent="Cat"]
+unique_name_in_owner = true
+script = ExtResource("2_stats")
+
+[node name="RoomCosmetics" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("5_room")
+
+[node name="UI" type="CanvasLayer" parent="."]
+script = ExtResource("3_ui")
+
+[node name="Root" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="SafeMargin" type="MarginContainer" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 36
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 48
+theme_override_constants/margin_bottom = 28
+
+[node name="Layout" type="Control" parent="UI/Root/SafeMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="StatsCard" type="PanelContainer" parent="UI/Root/SafeMargin/Layout"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -280.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 148.0
+grow_horizontal = 0
+
+[node name="StatsPanel" type="VBoxContainer" parent="UI/Root/SafeMargin/Layout/StatsCard"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="UI/Root/SafeMargin/Layout/StatsCard/StatsPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.4, 0.28, 0.3, 1)
+text = "小心情"
+horizontal_alignment = 1
+
+[node name="MoodRow" type="HBoxContainer" parent="UI/Root/SafeMargin/Layout/StatsCard/StatsPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="MoodLabel" type="Label" parent="UI/Root/SafeMargin/Layout/StatsCard/StatsPanel/MoodRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.35, 0.25, 0.28, 1)
+text = "心情"
+
+[node name="MoodBar" type="ProgressBar" parent="UI/Root/SafeMargin/Layout/StatsCard/StatsPanel/MoodRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 22)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 70.0
+show_percentage = false
+
+[node name="HungerRow" type="HBoxContainer" parent="UI/Root/SafeMargin/Layout/StatsCard/StatsPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HungerLabel" type="Label" parent="UI/Root/SafeMargin/Layout/StatsCard/StatsPanel/HungerRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.35, 0.25, 0.28, 1)
+text = "饥饿"
+
+[node name="HungerBar" type="ProgressBar" parent="UI/Root/SafeMargin/Layout/StatsCard/StatsPanel/HungerRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 22)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 30.0
+show_percentage = false
+
+[node name="BondRow" type="HBoxContainer" parent="UI/Root/SafeMargin/Layout/StatsCard/StatsPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BondLabel" type="Label" parent="UI/Root/SafeMargin/Layout/StatsCard/StatsPanel/BondRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.35, 0.25, 0.28, 1)
+text = "亲密"
+
+[node name="BondBar" type="ProgressBar" parent="UI/Root/SafeMargin/Layout/StatsCard/StatsPanel/BondRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 22)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 10.0
+show_percentage = false
+
+[node name="SpeechBubble" type="Control" parent="UI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 0
+offset_right = 200.0
+offset_bottom = 64.0
+mouse_filter = 2
+script = ExtResource("6_bubble")
+
+[node name="Panel" type="PanelContainer" parent="UI/Root/SpeechBubble"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="UI/Root/SpeechBubble/Panel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 26
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 26
+theme_override_constants/margin_bottom = 16
+
+[node name="FeedbackLabel" type="Label" parent="UI/Root/SpeechBubble/Panel/Margin"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.38, 0.26, 0.3, 1)
+text = "来摸摸我吧～"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Tail" type="Polygon2D" parent="UI/Root/SpeechBubble"]
+color = Color(1, 0.96, 0.94, 1)
+polygon = PackedVector2Array(-10, 0, 10, 0, 0, 14)
+
+[node name="Buttons" type="GridContainer" parent="UI/Root/SafeMargin/Layout"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -380.0
+offset_top = -88.0
+offset_right = 380.0
+offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 12
+columns = 4
+
+[node name="BtnPet" type="Button" parent="UI/Root/SafeMargin/Layout/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 68)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "摸摸"
+
+[node name="BtnFeed" type="Button" parent="UI/Root/SafeMargin/Layout/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 68)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "喂食"
+
+[node name="BtnPlay" type="Button" parent="UI/Root/SafeMargin/Layout/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 68)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "逗逗"
+
+[node name="BtnTheme" type="Button" parent="UI/Root/SafeMargin/Layout/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 68)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "换装·锁定"
+disabled = true
+
+[node name="BtnZoomBack" type="Button" parent="UI/Root/SafeMargin/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = -64.0
+offset_right = 132.0
+offset_bottom = -8.0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 20
+text = "返回"
+

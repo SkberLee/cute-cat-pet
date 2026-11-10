@@ -25,7 +25,10 @@ func _run() -> void:
 	var card: PanelContainer = main.get_node("UI/Root/SafeMargin/Layout/StatsCard")
 	var sb = card.get_theme_stylebox("panel")
 	assert(sb != null)
-	assert(sb.bg_color.a >= 0.9, "card opacity")
+	if sb is StyleBoxFlat:
+		assert(sb.bg_color.a >= 0.9, "card opacity")
+	elif sb is StyleBoxTexture:
+		assert(sb.texture != null, "pixel card texture")
 	var cat = main.get_node("%Cat")
 	assert(cat.get_node_or_null("CatTapBody") != null, "tap body")
 	assert(cat.has_method("get_focus_point"))
@@ -39,5 +42,5 @@ func _run() -> void:
 	await process_frame
 	ui._exit_zoom()
 	assert(ui._zoomed == false)
-	print("smoke_hud_zoom ok columns_land=", buttons.columns, " card_a=", sb.bg_color.a)
+	print("smoke_hud_zoom ok columns_land=", buttons.columns, " card_a=", (sb.bg_color.a if sb is StyleBoxFlat else 1.0))
 	quit(0)

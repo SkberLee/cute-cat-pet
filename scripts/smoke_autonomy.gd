@@ -13,7 +13,7 @@ func _run() -> void:
 	var cat = main.get_node("%Cat")
 	assert(cat.has_method("_choose_autonomy"))
 	assert(cat.has_method("_start_wander"))
-	var pos0: Vector3 = cat.position
+	var pos0 = cat.position
 	cat._cooldown = 0.0
 	cat._auto_busy = false
 	cat._wandering = false
@@ -22,7 +22,7 @@ func _run() -> void:
 	# Manually step wander a few frames
 	for i in 20:
 		cat._update_wander(0.05)
-	var moved: bool = cat.position.distance_to(pos0) > 0.02
+	var moved: bool = cat.position.distance_to(pos0) > 2.0
 	assert(moved, "cat should wander")
 	# User interaction cancels autonomy
 	cat._cooldown = 0.0

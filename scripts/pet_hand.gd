@@ -1,70 +1,106 @@
 # scripts/pet_hand.gd
-## HUD layer of the pet interaction: drives the 3D hand and draws floating hearts.
 class_name PetHand
 extends Control
 
-var _t := -1.0
-var _dur := 1.6
-var _camera: Camera3D
-var _cat: Node3D
-var _hearts: Array = []
-var hand3d: PetHand3D
+## 48px pixel palm that strokes the cat from forehead to nape in canvas space.
 
-func setup(camera: Camera3D, cat: Node3D) -> void:
-	_camera = camera
-	_cat = cat
+const HAND_PATH := "res://assets/pixel/fx/hand_48.png"
+const HEART_PATH := "res://assets/pixel/fx/heart.png"
+
+var _camera: Camera2D
+var _cat: Node2D
+var _playing := false
+var _elapsed := 0.0
+var _duration := 0.9
+var _hand: TextureRect
+var _hearts: Array[TextureRect] = []
+
+func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_anchors_preset(Control.PRESET_FULL_RECT)
-	visible = false
-	hand3d = PetHand3D.new()
-	hand3d.setup(cat)
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_hand = TextureRect.new()
+	_hand.texture = PixelUtil.tex(HAND_PATH)
+	_hand.stretch_mode = TextureRect.STRETCH_KEEP
+	_hand.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_hand.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hand.visible = false
+	_hand.size = Vector2(48, 48)
+	add_child(_hand)
+	for i in 3:
+		var h := TextureRect.new()
+		h.texture = PixelUtil.tex(HEART_PATH)
+		h.stretch_mode = TextureRect.STRETCH_KEEP
+		h.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		h.visible = false
+		h.size = Vector2(16, 16)
+		add_child(h)
+		_hearts.append(h)
 
-func play(duration: float) -> void:
-	_dur = maxf(duration, 2.2)
-	hand3d.play(_dur)
-	_t = 0.0
-	_hearts.clear()
+func setup(camera, cat) -> void:
+	if camera is Camera2D:
+		_camera = camera
+	_cat = cat as Node2D
+
+func play(duration: float = 0.9) -> void:
+	_duration = maxf(duration, 0.55)
+	_elapsed = 0.0
+	_playing = true
 	visible = true
-	queue_redraw()
+	if _hand:
+		_hand.visible = true
+	for h in _hearts:
+		h.visible = false
 
 func is_playing() -> bool:
-	return _t >= 0.0
+	return _playing
 
 func _process(delta: float) -> void:
-	if _t < 0.0:
+	if not _playing:
 		return
-	_t += delta
-	if _t >= _dur:
-		_t = -1.0
-		visible = false
-		return
-	queue_redraw()
+	_elapsed += delta
+	var t := clampf(_elapsed / _duration, 0.0, 1.0)
+	_place(t)
+	if t >= 1.0:
+		_playing = false
+		if _hand:
+			_hand.visible = false
+		for h in _hearts:
+			h.visible = false
 
-func _head_world() -> Vector3:
-	if _cat and _cat.has_method("get_head_point"):
-		return _cat.get_head_point()
-	return _cat.global_position + Vector3(0, 0.9, 0.3)
+func _head_canvas() -> Vector2:
+	if _cat == null:
+		return Vector2.ZERO
+	var p: Vector2
+	if _cat.has_method("get_head_point"):
+		p = _cat.get_head_point()
+	else:
+		p = _cat.global_position + Vector2(0, -42)
+	return _cat.get_canvas_transform() * p
+
+func _place(t: float) -> void:
+	var head := _head_canvas()
+	# Two slow strokes: forehead (above head) down toward the nape.
+	var cycle := fmod(t * 2.0, 1.0)
+	var stroke := 1.0 - absf(cycle * 2.0 - 1.0)
+	var start := head + Vector2(8, -28)
+	var finish := head + Vector2(-2, 6)
+	var pos := start.lerp(finish, stroke)
+	if _hand:
+		_hand.position = pos - Vector2(16, 28)
+		_hand.rotation_degrees = lerp(-18.0, 12.0, stroke)
+		_hand.modulate.a = 1.0 if t < 0.9 else (1.0 - (t - 0.9) / 0.1)
+	# Tiny hearts float up near the end of the first stroke.
+	for i in _hearts.size():
+		var ht := clampf((_elapsed - 0.15 - i * 0.12) / 0.55, 0.0, 1.0)
+		var h: TextureRect = _hearts[i]
+		if ht <= 0.0 or ht >= 1.0:
+			h.visible = false
+			continue
+		h.visible = true
+		h.position = head + Vector2(-8 + i * 10.0, -18.0 - ht * 28.0)
+		h.modulate.a = 1.0 - ht
 
 func _draw() -> void:
-	if _t < 0.0 or _camera == null or _cat == null:
-		return
-	var head: Vector3 = _head_world()
-	var p0 := _camera.unproject_position(head)
-	var right := _camera.global_transform.basis.x
-	var s := absf(_camera.unproject_position(head + right * 0.25).x - p0.x)   # 0.25 world units in px
-	s = clampf(s, 18.0, 400.0)
-	# floating hearts
-	var n := int(_t / 0.35)
-	for i in n:
-		var born := i * 0.35
-		var age := _t - born
-		if age > 1.1:
-			continue
-		var hx := p0.x - 0.9 * s + sin(float(i) * 2.3) * 0.5 * s
-		var hy := p0.y - 1.0 * s - age * 1.1 * s
-		_heart(Vector2(hx, hy), 0.30 * s, Color(1.0, 0.45, 0.6, clampf(1.1 - age, 0.0, 1.0)))
-
-func _heart(c: Vector2, r: float, col: Color) -> void:
-	draw_circle(c + Vector2(-r * 0.5, 0), r * 0.55, col)
-	draw_circle(c + Vector2(r * 0.5, 0), r * 0.55, col)
-	draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 1.02, r * 0.18), c + Vector2(r * 1.02, r * 0.18), c + Vector2(0, r * 1.35)]), col)
+	# Kept so older smokes that look for a Control overlay still find a node.
+	pass

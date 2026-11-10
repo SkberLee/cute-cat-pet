@@ -1,7 +1,7 @@
 extends SceneTree
 ## Dev tool: godot --path . -s res://tools/shot.gd --resolution 540x1200 -- out.png [scenario]
 ## scenarios: idle | bubble | walk | zoom | free | pet | pickfeed | pickplay | feed (food=id) | toy (toy=id)
-## extra k=v args (any scenario): cam=x,y,z look=x,y,z fov=deg clip=name t=sec nofloor=1 (hide Room) nohud=1 (hide UI)
+## extra k=v args (any scenario): cam=x,y zoom=n clip=name t=sec nofloor=1 (hide Room) nohud=1 (hide UI)
 ## clip= plays an animation on the cat and freezes it after t seconds (default 0.4).
 
 func _init() -> void:
@@ -28,11 +28,11 @@ func _run() -> void:
 	match scenario:
 		"bubble":
 			cat._cooldown = 0.0
-			cat._start_wander(Vector3(-1.8, 0, 1.2))
+			cat._start_wander(Vector2(64, 170))
 			wait = 1.4
 		"walk":
 			cat._cooldown = 0.0
-			cat._start_wander(Vector3(1.8, 0, -1.2))
+			cat._start_wander(Vector2(250, 120))
 			wait = 2.5
 		"zoom":
 			main.get_node("UI")._enter_zoom()
@@ -62,12 +62,12 @@ func _run() -> void:
 				await process_frame
 				guard += 0.016
 			wait = float(opts.get("t", "0.7"))
-		"mouseshow":   # static toy mouse placed in front of the cat (use cam=/look= with rel=1)
+		"mouseshow":
 			cat.set_autonomy_paused(true)
-			var mo: Node3D = load("res://scripts/cat_props.gd").make_toy("mouse")
-			main.add_child(mo)
-			mo.global_position = cat.global_position + Vector3(0.0, 0.0, 0.0) + Vector3(float(opts.get("mx", "1.0")), 0.0, 0.0)
-			mo.rotation.y = float(opts.get("my", "0.5"))
+			var mo: Node2D = load("res://scripts/cat_props.gd").make_food_2d("fish") if false else CatProps.make_toy_2d("mouse")
+			var holder = main.get_node_or_null("World/PropsHolder")
+			(holder if holder else main.get_node("World")).add_child(mo)
+			mo.global_position = cat.global_position + Vector2(float(opts.get("mx", "28")), 0.0)
 			wait = 0.3
 		"toy":
 			cat._cooldown = 0.0
@@ -92,30 +92,33 @@ func _run() -> void:
 	if opts.has("cam"):
 		var ui = main.get_node("UI")
 		ui._cam_follow = false
-		var cam: Camera3D = main.get_node("Camera3D")
-		var p := _v3(opts["cam"])
-		var lk := _v3(opts.get("look", "0,0.1,0.4"))
-		if opts.has("rel"):   # cam/look are offsets from the cat (or from the first prop with rel=prop)
-			var o: Vector3 = cat.global_position
-			p += o
-			lk += o
-		cam.global_position = p
-		cam.look_at(lk, Vector3.UP)
-		if opts.has("fov"):
-			cam.fov = float(opts["fov"])
+		var cam: Camera2D = main.get_node_or_null("World/Camera2D")
+		if cam:
+			var p := _v2(opts["cam"])
+			if opts.has("rel"):
+				p += cat.global_position
+			cam.position = p
+			if opts.has("zoom"):
+				var z := float(opts["zoom"])
+				cam.zoom = Vector2(z, z)
 	if opts.has("nofloor"):
-		main.get_node("Room").visible = false
+		var room = main.get_node_or_null("World/Room")
+		if room:
+			room.visible = false
 	if opts.has("nohud"):
 		main.get_node("UI").visible = false
 	for i in 3:
 		await process_frame
-	print("DBG props=", cat._props.map(func(n): return n.global_position), " yaw=", cat.rotation.y)
-	print("DBG cat=", cat.global_position, " cam=", main.get_node("Camera3D").global_position)
+	var cam_node = main.get_node_or_null("World/Camera2D")
+	print("DBG props=", cat._props.map(func(n): return n.global_position))
+	print("DBG cat=", cat.global_position, " cam=", cam_node.position if cam_node else "?")
 	var img := root.get_texture().get_image()
 	img.save_png(out)
 	print("SHOT ", out, " win=", root.size, " visible=", root.get_visible_rect().size, " scale=", root.content_scale_factor)
 	quit(0)
 
-func _v3(s: String) -> Vector3:
+func _v2(s: String) -> Vector2:
 	var p := s.split(",")
-	return Vector3(float(p[0]), float(p[1]), float(p[2]))
+	if p.size() >= 2:
+		return Vector2(float(p[0]), float(p[1]))
+	return Vector2.ZERO

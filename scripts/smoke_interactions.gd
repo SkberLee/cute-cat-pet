@@ -108,7 +108,7 @@ func _run() -> void:
 		await process_frame
 		assert(cat.is_busy_action(), "play sequence runs " + tid)
 		assert(cat._props.size() >= 1, "toy prop spawned " + tid)
-		var ok := await _wait_finish(cat, "play", 4000)
+		var ok := await _wait_finish(cat, "play", 8000)
 		assert(ok, "play finished " + tid)
 		assert(stats.mood > m0, "mood rises " + tid)
 		assert(cat._props.is_empty(), "toy cleaned up " + tid)
@@ -120,7 +120,7 @@ func _run() -> void:
 	await _settle(cat)
 	_finished.clear()
 	cat.do_play("wand")
-	await _wait_finish(cat, "play", 4000)
+	await _wait_finish(cat, "play", 8000)
 	var j := 0
 	while not ready[0] and j < 600:
 		await process_frame

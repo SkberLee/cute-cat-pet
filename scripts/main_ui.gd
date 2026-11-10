@@ -1,10 +1,10 @@
 # scripts/main_ui.gd
 extends CanvasLayer
 
-## Dual-orientation mobile UI. Soft bars + large touch targets.
+## Dual-orientation mobile UI over a 2D pixel room.
 ## Portrait: 2×2 action grid; landscape: single row. Tap cat to zoom.
 
-@onready var cat: Node3D = %Cat
+@onready var cat: Node2D = %Cat
 @onready var stats: PetStats = %PetStats
 @onready var mood_bar: ProgressBar = %MoodBar
 @onready var hunger_bar: ProgressBar = %HungerBar
@@ -17,7 +17,7 @@ extends CanvasLayer
 @onready var buttons: GridContainer = $Root/SafeMargin/Layout/Buttons
 @onready var feedback_label: Label = %FeedbackLabel
 @onready var speech_bubble: Node = %SpeechBubble
-@onready var camera: Camera3D = $"../Camera3D"
+@onready var camera: Camera2D = $"../World/Camera2D"
 @onready var room_cosmetics: RoomCosmetics = %RoomCosmetics
 @onready var safe_margin: MarginContainer = $Root/SafeMargin
 @onready var btn_zoom_back: Button = %BtnZoomBack
@@ -26,19 +26,15 @@ var _sfx_ui: AudioStream
 var _ui_player: AudioStreamPlayer
 var _portrait := false
 var _zoomed := false
-var _cam_base_fov := 48.0
-var _cam_dist := 3.0
-var _cam_focus_y := 0.5
-var _cam_follow_focus := Vector3.ZERO
+var _cam_fit_zoom := Vector2(2.25, 2.25)
+var _cam_fit_pos := Vector2(160, 104)
 var _cam_tween: Tween
 var _last_tap_ms := -10000
 var _cam_follow := true
-var _cam_target := Vector3.ZERO
-var _cam_pitch := -28.0
-const CAM_FOLLOW_K := 1.0
-const CAM_FOLLOW_SPEED := 5.0
+const CAM_FOLLOW_SPEED := 4.0
 const BASE_PORTRAIT := Vector2i(720, 1280)
 const BASE_LANDSCAPE := Vector2i(1280, 720)
+const ROOM_SIZE := Vector2(320, 208)
 var _ui_scale := 1.0
 var food_picker: PickPanel
 var toy_picker: PickPanel
@@ -80,8 +76,6 @@ func _ready() -> void:
 	_update_theme_button()
 
 func _unhandled_input(event: InputEvent) -> void:
-	# On Android a touch generates both ScreenTouch and an emulated mouse click;
-	# handle only one of them (touch) so zoom is never toggled twice by one tap.
 	if event is InputEventMouseButton:
 		if DisplayServer.is_touchscreen_available():
 			return
@@ -94,43 +88,49 @@ func _unhandled_input(event: InputEvent) -> void:
 			_try_tap_cat(st.position)
 
 func _try_tap_cat(screen_pos: Vector2) -> void:
-	if camera == null or cat == null:
+	if cat == null:
 		return
 	var now := Time.get_ticks_msec()
 	if now - _last_tap_ms < 450:
 		return
-	# Input positions arrive already in the stretched (canvas) space that Camera3D uses.
-	# Ignore taps that land on UI controls (buttons already consume).
-	var space := get_viewport().world_3d.direct_space_state
+	var space := get_viewport().world_2d.direct_space_state
 	if space == null:
 		return
-	var from := camera.project_ray_origin(screen_pos)
-	var to := from + camera.project_ray_normal(screen_pos) * 20.0
-	var query := PhysicsRayQueryParameters3D.create(from, to)
-	query.collide_with_areas = false
+	var world_pos := _screen_to_world(screen_pos)
+	var query := PhysicsPointQueryParameters2D.new()
+	query.position = world_pos
+	query.collide_with_areas = true
 	query.collide_with_bodies = true
-	var hit := space.intersect_ray(query)
-	if hit.is_empty():
-		return
-	var collider: Object = hit.get("collider")
-	if collider == null:
-		return
-	var n := collider as Node
-	if n == null:
-		return
-	# Accept CatTapBody or any ancestor under Cat.
+	var hits := space.intersect_point(query, 8)
 	var under_cat := false
-	var walk: Node = n
-	while walk:
-		if walk == cat:
-			under_cat = true
+	for hit in hits:
+		var n: Node = hit.get("collider") as Node
+		var walk := n
+		while walk:
+			if walk == cat:
+				under_cat = true
+				break
+			walk = walk.get_parent()
+		if under_cat:
 			break
-		walk = walk.get_parent()
+	# Fallback: axis-aligned body box around the feet origin.
+	if not under_cat:
+		var feet: Vector2 = cat.global_position
+		var box := Rect2(feet + Vector2(-22, -58), Vector2(44, 60))
+		if box.has_point(world_pos):
+			under_cat = true
 	if not under_cat:
 		return
 	_last_tap_ms = now
 	get_viewport().set_input_as_handled()
 	_toggle_zoom()
+
+func _screen_to_world(screen_pos: Vector2) -> Vector2:
+	if cat and is_instance_valid(cat):
+		return cat.get_canvas_transform().affine_inverse() * screen_pos
+	if camera:
+		return camera.get_canvas_transform().affine_inverse() * screen_pos
+	return screen_pos
 
 func _toggle_zoom() -> void:
 	if _zoomed:
@@ -138,34 +138,39 @@ func _toggle_zoom() -> void:
 	else:
 		_enter_zoom()
 
-func _focus_for_cat() -> Vector3:
-	var c := Vector3.ZERO
-	if cat:
-		# The model's origin is at its tail end; aim at the body centre instead.
-		c = cat.global_position + cat.global_transform.basis.z * 0.35
-		if cat.get("has_anchor"):
-			c = c.lerp(cat.get("action_anchor"), 0.5)
-	return Vector3(c.x * CAM_FOLLOW_K, _cam_focus_y, c.z * CAM_FOLLOW_K)
-
-func _cam_pos_for(focus: Vector3) -> Vector3:
-	var p := deg_to_rad(-_cam_pitch)
-	return focus + Vector3(0.0, sin(p), cos(p)) * _cam_dist
+func _fit_camera_metrics() -> void:
+	var vis := get_viewport().get_visible_rect().size
+	if vis.x < 1.0 or vis.y < 1.0:
+		return
+	# Fit the whole room, then nudge downward a little so HUD doesn't cover the floor.
+	var z := minf(vis.x / ROOM_SIZE.x, vis.y / ROOM_SIZE.y)
+	_cam_fit_zoom = Vector2(z, z)
+	var visible_h := vis.y / z
+	var extra := visible_h - ROOM_SIZE.y
+	var y := ROOM_SIZE.y * 0.5
+	if _portrait and extra > 0.0:
+		# Keep the room optically between the HUD and the buttons.
+		y = ROOM_SIZE.y * 0.5 + minf(extra * 0.06, 12.0)
+	elif not _portrait:
+		# Nudge up so the bottom action row covers less of the floor.
+		y = ROOM_SIZE.y * 0.5 - 12.0
+	_cam_fit_pos = Vector2(ROOM_SIZE.x * 0.5, y)
 
 func _snap_camera() -> void:
 	if camera == null:
 		return
-	_cam_follow_focus = _focus_for_cat()
-	camera.fov = _cam_base_fov
-	camera.keep_aspect = Camera3D.KEEP_WIDTH if _portrait else Camera3D.KEEP_HEIGHT
-	camera.transform = Transform3D(Basis(Vector3.RIGHT, deg_to_rad(_cam_pitch)), _cam_pos_for(_cam_follow_focus))
+	_fit_camera_metrics()
+	camera.zoom = _cam_fit_zoom
+	camera.position = _cam_fit_pos
+	camera.enabled = true
+	camera.make_current()
 
 func _process(delta: float) -> void:
-	# Gentle follow so the roaming cat always stays in frame.
 	if camera == null or cat == null or _zoomed or not _cam_follow:
 		return
-	var target := _focus_for_cat()
-	_cam_follow_focus = _cam_follow_focus.lerp(target, clampf(CAM_FOLLOW_SPEED * delta, 0.0, 1.0))
-	camera.position = _cam_pos_for(_cam_follow_focus)
+	# Gentle pull toward the roaming cat, but stay mostly room-framed.
+	var target := _cam_fit_pos.lerp(cat.global_position + Vector2(0, -20), 0.22)
+	camera.position = camera.position.lerp(target, clampf(CAM_FOLLOW_SPEED * delta, 0.0, 1.0))
 
 func _enter_zoom() -> void:
 	if camera == null or cat == null:
@@ -178,20 +183,15 @@ func _enter_zoom() -> void:
 	if btn_zoom_back:
 		btn_zoom_back.visible = true
 	_play_ui()
-	var focus: Vector3 = cat.get_focus_point() if cat.has_method("get_focus_point") else cat.global_position + Vector3(0, 0.7, 0)
-	var zoom_pos := focus + Vector3(0.0, 0.2, 1.25 if _portrait else 1.08)
+	var focus: Vector2 = cat.get_focus_point() if cat.has_method("get_focus_point") else cat.global_position + Vector2(0, -36)
+	var z := _cam_fit_zoom * (2.15 if _portrait else 1.9)
 	if _cam_tween and _cam_tween.is_valid():
 		_cam_tween.kill()
 	_cam_tween = create_tween()
 	_cam_tween.set_parallel(true)
-	_cam_tween.tween_property(camera, "global_position", zoom_pos, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_cam_tween.tween_property(camera, "fov", 46.0 if _portrait else 34.0, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_cam_tween.tween_method(func(_t: float) -> void: _aim_camera(focus), 0.0, 1.0, 0.45)
+	_cam_tween.tween_property(camera, "position", focus + Vector2(0, 8), 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_cam_tween.tween_property(camera, "zoom", z, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_bubble_say("近距离看我～")
-
-func _aim_camera(focus: Vector3) -> void:
-	if camera and is_instance_valid(cat):
-		camera.look_at(focus, Vector3.UP)
 
 func _exit_zoom() -> void:
 	_zoomed = false
@@ -207,26 +207,19 @@ func _on_zoom_back() -> void:
 func _restore_camera(animated: bool) -> void:
 	if camera == null:
 		return
+	_fit_camera_metrics()
 	if _cam_tween and _cam_tween.is_valid():
 		_cam_tween.kill()
 	if not animated:
 		_cam_follow = true
 		_snap_camera()
 		return
-	var focus := _focus_for_cat()
-	var target_pos := _cam_pos_for(focus)
-	var target_basis := Basis(Vector3.RIGHT, deg_to_rad(_cam_pitch))
-	var from_q := camera.global_transform.basis.get_rotation_quaternion()
 	_cam_tween = create_tween()
 	_cam_tween.set_parallel(true)
-	_cam_tween.tween_property(camera, "global_position", target_pos, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_cam_tween.tween_property(camera, "fov", _cam_base_fov, 0.4)
-	_cam_tween.tween_method(func(t: float) -> void:
-		camera.global_transform.basis = Basis(from_q.slerp(target_basis.get_rotation_quaternion(), t))
-	, 0.0, 1.0, 0.4)
+	_cam_tween.tween_property(camera, "position", _cam_fit_pos, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_cam_tween.tween_property(camera, "zoom", _cam_fit_zoom, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_cam_tween.set_parallel(false)
 	_cam_tween.tween_callback(func ():
-		_cam_follow_focus = focus
 		_cam_follow = true
 		if cat and cat.has_method("set_autonomy_paused"):
 			cat.set_autonomy_paused(false)
@@ -245,6 +238,18 @@ func _play_ui() -> void:
 		_ui_player.play()
 
 func _style_ui() -> void:
+	var root := $Root as Control
+	if root:
+		root.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var theme := Theme.new()
+		var f := PixelUtil.font()
+		if f:
+			theme.default_font = f
+			theme.default_font_size = 16
+			theme.set_font("font", "Label", f)
+			theme.set_font("font", "Button", f)
+			theme.set_font("font", "ProgressBar", f)
+		root.theme = theme
 	_apply_stats_card_style()
 	_style_bar(mood_bar, Color(0.95, 0.55, 0.68))
 	_style_bar(hunger_bar, Color(0.96, 0.72, 0.38))
@@ -252,82 +257,68 @@ func _style_ui() -> void:
 	for b in [btn_pet, btn_feed, btn_play, btn_theme, btn_zoom_back]:
 		_style_button(b)
 
+func _nine_tex(path: String, ml: int, mt: int, mr: int, mb: int) -> StyleBoxTexture:
+	var sb := StyleBoxTexture.new()
+	sb.texture = PixelUtil.tex(path)
+	sb.texture_margin_left = ml
+	sb.texture_margin_top = mt
+	sb.texture_margin_right = mr
+	sb.texture_margin_bottom = mb
+	return sb
+
 func _apply_stats_card_style() -> void:
 	if stats_card == null:
 		return
-	var panel := StyleBoxFlat.new()
-	# More opaque so wall / table don't bleed through.
-	panel.bg_color = Color(1.0, 0.965, 0.95, 0.94)
-	panel.corner_radius_top_left = 20
-	panel.corner_radius_top_right = 20
-	panel.corner_radius_bottom_left = 20
-	panel.corner_radius_bottom_right = 20
-	panel.content_margin_left = 22
-	panel.content_margin_right = 22
-	panel.content_margin_top = 16
-	panel.content_margin_bottom = 18
-	panel.border_width_left = 1
-	panel.border_width_top = 1
-	panel.border_width_right = 1
-	panel.border_width_bottom = 1
-	panel.border_color = Color(0.86, 0.72, 0.74, 0.55)
-	panel.shadow_color = Color(0.45, 0.28, 0.32, 0.18)
-	panel.shadow_size = 8
-	panel.shadow_offset = Vector2(0, 3)
-	stats_card.add_theme_stylebox_override("panel", panel)
+	stats_card.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var sb := _nine_tex("res://assets/pixel/ui/panel_mood.png", 12, 12, 12, 12)
+	if sb.texture:
+		sb.content_margin_left = 16
+		sb.content_margin_right = 16
+		sb.content_margin_top = 12
+		sb.content_margin_bottom = 12
+		stats_card.add_theme_stylebox_override("panel", sb)
+	else:
+		var panel := StyleBoxFlat.new()
+		panel.bg_color = Color(1.0, 0.965, 0.95, 0.94)
+		panel.set_corner_radius_all(8)
+		stats_card.add_theme_stylebox_override("panel", panel)
 
 func _style_bar(bar: ProgressBar, fill: Color) -> void:
 	if bar == null:
 		return
 	var bg := StyleBoxFlat.new()
-	# Stronger track contrast against pale card / wall.
 	bg.bg_color = Color(0.78, 0.68, 0.66, 0.42)
-	bg.corner_radius_top_left = 10
-	bg.corner_radius_top_right = 10
-	bg.corner_radius_bottom_left = 10
-	bg.corner_radius_bottom_right = 10
+	bg.set_corner_radius_all(2)
 	bg.content_margin_left = 2
 	bg.content_margin_right = 2
 	bg.content_margin_top = 2
 	bg.content_margin_bottom = 2
-	bg.border_width_left = 1
-	bg.border_width_top = 1
-	bg.border_width_right = 1
-	bg.border_width_bottom = 1
-	bg.border_color = Color(0.62, 0.5, 0.5, 0.35)
+	bg.set_border_width_all(1)
+	bg.border_color = Color(0.45, 0.32, 0.34, 0.55)
 	var fg := StyleBoxFlat.new()
 	fg.bg_color = fill
-	fg.corner_radius_top_left = 8
-	fg.corner_radius_top_right = 8
-	fg.corner_radius_bottom_left = 8
-	fg.corner_radius_bottom_right = 8
+	fg.set_corner_radius_all(2)
 	bar.add_theme_stylebox_override("background", bg)
 	bar.add_theme_stylebox_override("fill", fg)
 	bar.show_percentage = false
-	bar.custom_minimum_size.y = 30
+	bar.custom_minimum_size.y = 16
 
 func _style_button(btn: Button) -> void:
 	if btn == null:
 		return
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(1, 0.92, 0.9, 0.95)
-	normal.corner_radius_top_left = 28
-	normal.corner_radius_top_right = 28
-	normal.corner_radius_bottom_left = 28
-	normal.corner_radius_bottom_right = 28
-	normal.content_margin_left = 12
-	normal.content_margin_right = 12
-	normal.content_margin_top = 12
-	normal.content_margin_bottom = 12
-	normal.shadow_color = Color(0.4, 0.25, 0.28, 0.12)
-	normal.shadow_size = 4
-	normal.shadow_offset = Vector2(0, 2)
+	btn.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var normal := _nine_tex("res://assets/pixel/ui/button.png", 10, 6, 10, 6)
+	normal.content_margin_left = 10
+	normal.content_margin_right = 10
+	normal.content_margin_top = 6
+	normal.content_margin_bottom = 6
 	var hover := normal.duplicate()
-	hover.bg_color = Color(1, 0.86, 0.84, 0.98)
-	var pressed := normal.duplicate()
-	pressed.bg_color = Color(0.95, 0.78, 0.76, 1)
+	var pressed := _nine_tex("res://assets/pixel/ui/button_pressed.png", 10, 6, 10, 6)
+	pressed.content_margin_left = 10
+	pressed.content_margin_right = 10
+	pressed.content_margin_top = 8
+	pressed.content_margin_bottom = 4
 	var disabled := normal.duplicate()
-	disabled.bg_color = Color(0.9, 0.88, 0.86, 0.55)
 	btn.add_theme_stylebox_override("normal", normal)
 	btn.add_theme_stylebox_override("hover", hover)
 	btn.add_theme_stylebox_override("pressed", pressed)
@@ -336,6 +327,9 @@ func _style_button(btn: Button) -> void:
 	btn.add_theme_color_override("font_hover_color", Color(0.28, 0.18, 0.22))
 	btn.add_theme_color_override("font_pressed_color", Color(0.22, 0.14, 0.16))
 	btn.add_theme_color_override("font_disabled_color", Color(0.5, 0.45, 0.45, 0.7))
+	var f := PixelUtil.font()
+	if f:
+		btn.add_theme_font_override("font", f)
 
 func _on_viewport_resized() -> void:
 	var win := get_window()
@@ -343,8 +337,6 @@ func _on_viewport_resized() -> void:
 	if wsize.x < 1.0 or wsize.y < 1.0:
 		return
 	var portrait_now := wsize.y > wsize.x
-	# Per-orientation design resolution: UI is authored for the SHORT side being
-	# 720 units, so a tall phone doesn't shrink everything to a 1280-wide layout.
 	var base := BASE_PORTRAIT if portrait_now else BASE_LANDSCAPE
 	if win.content_scale_size != base:
 		win.content_scale_size = base
@@ -354,7 +346,6 @@ func _on_viewport_resized() -> void:
 	_apply_layout()
 
 func _safe_insets() -> Vector4:
-	# left, top, right, bottom in canvas units (0 on desktop windows).
 	var win := get_window()
 	var scr_size := DisplayServer.screen_get_size(win.current_screen)
 	var safe := DisplayServer.get_display_safe_area()
@@ -385,7 +376,7 @@ func _set_stats_fonts(title_fs: int, label_fs: int, label_w: float, bar_h: float
 			elif c is ProgressBar:
 				c.custom_minimum_size.y = bar_h
 				c.custom_minimum_size.x = 120.0
-	(panel as VBoxContainer).add_theme_constant_override("separation", int(bar_h * 0.35))
+	(panel as VBoxContainer).add_theme_constant_override("separation", int(maxf(bar_h * 0.25, 4.0)))
 
 func _apply_layout() -> void:
 	if stats_card == null or buttons == null:
@@ -393,12 +384,11 @@ func _apply_layout() -> void:
 	var ins := _safe_insets()
 	var btn_list: Array = [btn_pet, btn_feed, btn_play, btn_theme]
 	if _portrait:
-		# Base 720 wide: 2x2 grid, each button ~44% width x ~9% of a 16:9-ish height.
-		var m := 24.0
+		var m := 20.0
 		safe_margin.add_theme_constant_override("margin_left", int(m + ins.x))
 		safe_margin.add_theme_constant_override("margin_right", int(m + ins.z))
-		safe_margin.add_theme_constant_override("margin_top", int(18.0 + ins.y))
-		safe_margin.add_theme_constant_override("margin_bottom", int(26.0 + ins.w))
+		safe_margin.add_theme_constant_override("margin_top", int(16.0 + ins.y))
+		safe_margin.add_theme_constant_override("margin_bottom", int(22.0 + ins.w))
 		stats_card.anchor_left = 0.0
 		stats_card.anchor_right = 1.0
 		stats_card.anchor_top = 0.0
@@ -407,8 +397,8 @@ func _apply_layout() -> void:
 		stats_card.offset_right = 0.0
 		stats_card.offset_top = 0.0
 		stats_card.offset_bottom = 10.0
-		_set_stats_fonts(30, 30, 96.0, 34.0)
-		var bh := 118.0
+		_set_stats_fonts(22, 20, 72.0, 18.0)
+		var bh := 96.0
 		buttons.columns = 2
 		buttons.anchor_left = 0.0
 		buttons.anchor_right = 1.0
@@ -416,14 +406,14 @@ func _apply_layout() -> void:
 		buttons.anchor_bottom = 1.0
 		buttons.offset_left = 0.0
 		buttons.offset_right = 0.0
-		buttons.offset_top = -(bh * 2.0 + 16.0)
+		buttons.offset_top = -(bh * 2.0 + 12.0)
 		buttons.offset_bottom = 0.0
-		buttons.add_theme_constant_override("h_separation", 18)
-		buttons.add_theme_constant_override("v_separation", 16)
+		buttons.add_theme_constant_override("h_separation", 12)
+		buttons.add_theme_constant_override("v_separation", 10)
 		for b in btn_list:
 			if b:
 				b.custom_minimum_size = Vector2(0, bh)
-				b.add_theme_font_size_override("font_size", 38)
+				b.add_theme_font_size_override("font_size", 28)
 				b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if btn_zoom_back:
 			btn_zoom_back.anchor_left = 0.5
@@ -432,30 +422,26 @@ func _apply_layout() -> void:
 			btn_zoom_back.anchor_bottom = 1.0
 			btn_zoom_back.offset_left = -120.0
 			btn_zoom_back.offset_right = 120.0
-			btn_zoom_back.offset_bottom = -(bh * 2.0 + 16.0 + 14.0)
-			btn_zoom_back.offset_top = btn_zoom_back.offset_bottom - 92.0
-			btn_zoom_back.add_theme_font_size_override("font_size", 36)
+			btn_zoom_back.offset_bottom = -(bh * 2.0 + 12.0 + 12.0)
+			btn_zoom_back.offset_top = btn_zoom_back.offset_bottom - 72.0
+			btn_zoom_back.add_theme_font_size_override("font_size", 26)
 		if speech_bubble and speech_bubble.has_method("set_metrics"):
-			speech_bubble.set_metrics(34, 540.0)
-		_cam_base_fov = 32.0      # horizontal FOV (KEEP_WIDTH)
-		_cam_pitch = -30.0
-		_cam_dist = 3.1
-		_cam_focus_y = 0.55
+			speech_bubble.set_metrics(26, 480.0)
 	else:
-		safe_margin.add_theme_constant_override("margin_left", int(36.0 + ins.x))
-		safe_margin.add_theme_constant_override("margin_right", int(36.0 + ins.z))
-		safe_margin.add_theme_constant_override("margin_top", int(20.0 + ins.y))
-		safe_margin.add_theme_constant_override("margin_bottom", int(24.0 + ins.w))
+		safe_margin.add_theme_constant_override("margin_left", int(28.0 + ins.x))
+		safe_margin.add_theme_constant_override("margin_right", int(28.0 + ins.z))
+		safe_margin.add_theme_constant_override("margin_top", int(16.0 + ins.y))
+		safe_margin.add_theme_constant_override("margin_bottom", int(18.0 + ins.w))
 		stats_card.anchor_left = 1.0
 		stats_card.anchor_right = 1.0
 		stats_card.anchor_top = 0.0
 		stats_card.anchor_bottom = 0.0
-		stats_card.offset_left = -400.0
+		stats_card.offset_left = -340.0
 		stats_card.offset_right = 0.0
 		stats_card.offset_top = 0.0
 		stats_card.offset_bottom = 10.0
-		_set_stats_fonts(26, 26, 84.0, 28.0)
-		var bh := 92.0
+		_set_stats_fonts(18, 18, 64.0, 16.0)
+		var bh := 72.0
 		buttons.columns = 4
 		buttons.anchor_left = 0.5
 		buttons.anchor_right = 0.5
@@ -465,12 +451,12 @@ func _apply_layout() -> void:
 		buttons.offset_right = 480.0
 		buttons.offset_top = -bh
 		buttons.offset_bottom = 0.0
-		buttons.add_theme_constant_override("h_separation", 18)
-		buttons.add_theme_constant_override("v_separation", 10)
+		buttons.add_theme_constant_override("h_separation", 14)
+		buttons.add_theme_constant_override("v_separation", 8)
 		for b in btn_list:
 			if b:
 				b.custom_minimum_size = Vector2(0, bh)
-				b.add_theme_font_size_override("font_size", 30)
+				b.add_theme_font_size_override("font_size", 22)
 				b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if btn_zoom_back:
 			btn_zoom_back.anchor_left = 0.0
@@ -478,18 +464,14 @@ func _apply_layout() -> void:
 			btn_zoom_back.anchor_top = 0.0
 			btn_zoom_back.anchor_bottom = 0.0
 			btn_zoom_back.offset_left = 0.0
-			btn_zoom_back.offset_right = 200.0
+			btn_zoom_back.offset_right = 180.0
 			btn_zoom_back.offset_top = 0.0
-			btn_zoom_back.offset_bottom = 84.0
-			btn_zoom_back.add_theme_font_size_override("font_size", 32)
+			btn_zoom_back.offset_bottom = 64.0
+			btn_zoom_back.add_theme_font_size_override("font_size", 22)
 		if speech_bubble and speech_bubble.has_method("set_metrics"):
-			speech_bubble.set_metrics(30, 480.0)
-		_cam_base_fov = 44.0      # vertical FOV (KEEP_HEIGHT)
-		_cam_pitch = -24.0
-		_cam_dist = 3.2
-		_cam_focus_y = 0.55
+			speech_bubble.set_metrics(22, 420.0)
 	if btn_theme:
-		btn_theme.add_theme_font_size_override("font_size", 34 if _portrait else 28)
+		btn_theme.add_theme_font_size_override("font_size", 24 if _portrait else 20)
 	_layout_pickers(ins)
 	if not _zoomed:
 		_restore_camera(false)
@@ -499,7 +481,7 @@ func _set_buttons_enabled(enabled: bool) -> void:
 	btn_feed.disabled = not enabled
 	btn_play.disabled = not enabled
 
-func _on_busy(_action: String) -> void:
+func _on_busy(_action: String, _item: String = "") -> void:
 	_set_buttons_enabled(false)
 
 func _on_ready_again() -> void:
@@ -517,7 +499,6 @@ func _on_pet() -> void:
 		cat.do_pet()
 
 func _on_feed() -> void:
-	# The feed button opens the food picker; picking a food starts the sequence.
 	if food_picker == null:
 		if cat and cat.has_method("do_feed"):
 			cat.do_feed()
@@ -553,7 +534,7 @@ func _close_pickers() -> void:
 	if toy_picker:
 		toy_picker.visible = false
 
-func _on_pet_stroke(duration: float) -> void:
+func _on_pet_stroke(duration: float = 0.9) -> void:
 	if pet_hand:
 		pet_hand.play(duration)
 
@@ -587,23 +568,23 @@ func _layout_pickers(ins: Vector4) -> void:
 		pk.anchor_top = 1.0
 		pk.anchor_bottom = 1.0
 		if _portrait:
-			var bottom := -(118.0 * 2.0 + 16.0 + 26.0 + ins.w + 14.0)
+			var bottom := -(96.0 * 2.0 + 12.0 + 22.0 + ins.w + 12.0)
 			pk.anchor_left = 0.0
 			pk.anchor_right = 1.0
-			pk.offset_left = 24.0 + ins.x
-			pk.offset_right = -(24.0 + ins.z)
+			pk.offset_left = 20.0 + ins.x
+			pk.offset_right = -(20.0 + ins.z)
 			pk.offset_bottom = bottom
-			pk.offset_top = bottom - 250.0
-			pk.set_metrics(30, 250.0)
+			pk.offset_top = bottom - 220.0
+			pk.set_metrics(22, 220.0)
 		else:
-			var bottom := -(92.0 + 24.0 + ins.w + 12.0)
+			var bottom := -(72.0 + 18.0 + ins.w + 10.0)
 			pk.anchor_left = 0.5
 			pk.anchor_right = 0.5
 			pk.offset_left = -480.0
 			pk.offset_right = 480.0
 			pk.offset_bottom = bottom
-			pk.offset_top = bottom - 190.0
-			pk.set_metrics(26, 190.0)
+			pk.offset_top = bottom - 180.0
+			pk.set_metrics(20, 180.0)
 
 func _on_theme() -> void:
 	if room_cosmetics == null or stats == null:
@@ -614,10 +595,8 @@ func _on_theme() -> void:
 	_bubble_say("房间换成「%s」啦" % room_cosmetics.theme_display_name(id))
 	_save_game()
 
-func _on_milestone_ui(threshold: int, title: String) -> void:
+func _on_milestone_ui(_threshold: int, _title: String) -> void:
 	_update_theme_button()
-	if feedback_label and threshold >= 25:
-		pass
 	_save_game()
 
 func _update_theme_button() -> void:

@@ -17,8 +17,12 @@ func _run() -> void:
 	assert(label != null)
 	var cat: Node = main.get_node("%Cat")
 	assert(cat.has_method("get_mouth_point"))
-	var mouth: Vector3 = cat.get_mouth_point()
-	assert(mouth.y > cat.global_position.y)
+	var mouth = cat.get_mouth_point()
+	# 2D y-down: the mouth sits above the paws. 3D y-up is also accepted.
+	if mouth is Vector2:
+		assert(mouth.y < cat.global_position.y, "mouth should sit above the paws")
+	else:
+		assert(mouth.y > cat.global_position.y)
 	bubble.show_line("测试说话框～", true)
 	assert(label.text.find("测试") >= 0)
 	assert(bubble.visible == true)

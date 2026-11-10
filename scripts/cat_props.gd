@@ -304,3 +304,56 @@ static func _mi_node(mesh: Mesh, mat: Material) -> MeshInstance3D:
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return mi
+
+
+## --- 2D pixel props (v0.2.7). 3D makers above are kept for the archived scene. ---
+const FOOD_TEX := {
+	"fish": "res://assets/pixel/food/fish.png",
+	"kibble": "res://assets/pixel/food/kibble_bowl.png",
+	"can": "res://assets/pixel/food/can.png",
+	"milk": "res://assets/pixel/food/milk.png",
+}
+const TOY_TEX := {
+	"wand": "res://assets/pixel/toys/wand.png",
+	"yarn": "res://assets/pixel/toys/yarn.png",
+	"laser": "res://assets/pixel/toys/laser.png",
+	"mouse": "res://assets/pixel/toys/mouse.png",
+}
+
+static func make_food_2d(id: String) -> Node2D:
+	var root := Node2D.new()
+	root.name = "Food2D_%s" % id
+	var spr := PixelUtil.sprite(FOOD_TEX.get(id, FOOD_TEX["fish"]))
+	spr.name = "Sprite"
+	# sit on the floor; bowl/can sprites are ~32px, origin at feet
+	spr.offset = Vector2(0, -12)
+	root.add_child(spr)
+	var content := Node2D.new()
+	content.name = "Content"
+	content.position = Vector2(0, -8)
+	root.add_child(content)
+	return root
+
+static func make_toy_2d(id: String) -> Node2D:
+	var root := Node2D.new()
+	root.name = "Toy2D_%s" % id
+	var spr := PixelUtil.sprite(TOY_TEX.get(id, TOY_TEX["yarn"]))
+	spr.name = "Sprite"
+	spr.offset = Vector2(0, -12)
+	root.add_child(spr)
+	if id == "wand":
+		var rod := Node2D.new()
+		rod.name = "Rod"
+		root.add_child(rod)
+		var tip := Node2D.new()
+		tip.name = "Tip"
+		tip.position = Vector2(10, -18)
+		root.add_child(tip)
+	elif id == "yarn":
+		var spin := Node2D.new()
+		spin.name = "Spin"
+		root.add_child(spin)
+	elif id == "laser":
+		spr.offset = Vector2(0, 0)
+		spr.modulate = Color(1, 0.35, 0.4, 1)
+	return root
