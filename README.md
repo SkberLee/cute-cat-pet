@@ -1,4 +1,4 @@
-# 治愈猫 · Godot 4.7 原型（v0.2.7）
+# 治愈猫 · Godot 4.7 原型（v0.2.8）
 
 送礼向轻养成电子宠物猫。v0.2.7 起可玩的主场景改为 **2D 像素风**（星露谷式 16-bit 原画，资源在 `assets/pixel/`）；原先的 3D 房间与模型仍保留在仓库里（`scenes/main_3d.tscn`、`scripts/legacy_3d/`、`assets/models/`），不再作为启动场景。轻养成 + 治愈日常：一只猫、温馨小房间、摸摸 / 喂食 / 逗逗，无死亡惩罚。
 
@@ -8,6 +8,12 @@
 - 渲染：`mobile`（面向 Android）
 - 语言：GDScript，UI 简体中文
 - **屏幕方向：自动旋转（sensor）** — 横竖屏都会适配 UI；基准分辨率 1280×720（竖屏 720×1280）
+
+## v0.2.8 新内容
+
+- **猫咪四向走路**：补上朝屏幕（walk_down）、背对（walk_up）和更清楚的侧面走（walk_side，左右共用、向左时水平翻转）各 4 帧，以及对应的 idle / 背坐 `sit_up`。走路不再只靠侧面图左右翻转，上下走也不会再横着滑或停下突然正坐。
+- 朝向由移动向量决定（主轴 + 约 1.15 倍滞回，斜向沿用最近的前后或左右）；正面和背面图绝不翻转。自由走动、走向食物、追玩具都走同一套朝向；停下时坐在对应方向的 idle。
+- 像素预览见 `assets/pixel/preview_walk_dirs.png` 与 `screenshots/pixel_preview_cat_walk.png`；游戏内截图见 `screenshots/v028_walk_*.png`、`screenshots/v028_portrait_roam.png`。
 
 ## v0.2.7 新内容
 
@@ -104,7 +110,7 @@
 
 GitHub Releases：https://github.com/SkberLee/cute-cat-pet/releases
 
-推荐安装 `cute-cat-pet-0.2.7-release.apk`。若已装旧 debug 包，请先卸载再装（签名不同）。
+推荐安装 `cute-cat-pet-0.2.8-release.apk`。若已装旧 debug 包，请先卸载再装（签名不同）。
 
 ## 授权
 

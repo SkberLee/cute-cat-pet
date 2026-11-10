@@ -23,24 +23,42 @@ static func cat_frames() -> SpriteFrames:
 	var sf := SpriteFrames.new()
 	_add(sf, "sit", ["res://assets/pixel/cat/sit.png"], 1.0, true)
 	_add(sf, "idle", ["res://assets/pixel/cat/sit.png"], 1.0, true)
+	_add(sf, "idle_down", ["res://assets/pixel/cat/idle_down.png"], 1.0, true)
 	_add(sf, "sit_blink", ["res://assets/pixel/cat/sit_blink.png"], 6.0, false)
 	_add(sf, "call", ["res://assets/pixel/cat/call.png"], 4.0, false)
 	_add(sf, "happy", ["res://assets/pixel/cat/happy.png"], 4.0, true)
 	_add(sf, "idle_alt", ["res://assets/pixel/cat/happy.png"], 4.0, false)
 	_add(sf, "sleep", ["res://assets/pixel/cat/sleep.png"], 2.0, true)
 	_add(sf, "sit_side", ["res://assets/pixel/cat/sit_side.png"], 1.0, true)
-	_add(sf, "walk", [
-		"res://assets/pixel/cat/walk_0.png",
-		"res://assets/pixel/cat/walk_1.png",
-		"res://assets/pixel/cat/walk_2.png",
-		"res://assets/pixel/cat/walk_3.png",
-	], 8.0, true)
-	_add(sf, "run", [
-		"res://assets/pixel/cat/walk_0.png",
-		"res://assets/pixel/cat/walk_1.png",
-		"res://assets/pixel/cat/walk_2.png",
-		"res://assets/pixel/cat/walk_3.png",
-	], 12.0, true)
+	_add(sf, "idle_side", ["res://assets/pixel/cat/idle_side.png"], 1.0, true)
+	_add(sf, "sit_up", ["res://assets/pixel/cat/sit_up.png"], 1.0, true)
+	_add(sf, "idle_up", ["res://assets/pixel/cat/idle_up.png"], 1.0, true)
+	var side := [
+		"res://assets/pixel/cat/walk_side_0.png",
+		"res://assets/pixel/cat/walk_side_1.png",
+		"res://assets/pixel/cat/walk_side_2.png",
+		"res://assets/pixel/cat/walk_side_3.png",
+	]
+	var down := [
+		"res://assets/pixel/cat/walk_down_0.png",
+		"res://assets/pixel/cat/walk_down_1.png",
+		"res://assets/pixel/cat/walk_down_2.png",
+		"res://assets/pixel/cat/walk_down_3.png",
+	]
+	var up := [
+		"res://assets/pixel/cat/walk_up_0.png",
+		"res://assets/pixel/cat/walk_up_1.png",
+		"res://assets/pixel/cat/walk_up_2.png",
+		"res://assets/pixel/cat/walk_up_3.png",
+	]
+	_add(sf, "walk", side, 8.0, true)
+	_add(sf, "walk_side", side, 8.0, true)
+	_add(sf, "walk_down", down, 8.0, true)
+	_add(sf, "walk_up", up, 8.0, true)
+	_add(sf, "run", side, 12.0, true)
+	_add(sf, "run_side", side, 12.0, true)
+	_add(sf, "run_down", down, 12.0, true)
+	_add(sf, "run_up", up, 12.0, true)
 	_add(sf, "eat", [
 		"res://assets/pixel/cat/eat_0.png",
 		"res://assets/pixel/cat/eat_1.png",

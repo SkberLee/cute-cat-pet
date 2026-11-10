@@ -104,7 +104,7 @@ def room_mockup(scale=5) -> Image.Image:
 def preview_sheet():
     W = 1600
     # we'll grow height as we go; start large and crop
-    c = new_canvas(W, 2200)
+    c = new_canvas(W, 4000)
     d = ImageDraw.Draw(c)
     y = 24
     text(d, (40, y), "治愈猫 · 像素资源预览  （Stardew 风味的原创像素，非描摹）", 28)
@@ -120,19 +120,22 @@ def preview_sheet():
     y += pal.height + 28
 
     # cat
-    text(d, (40, y), "猫咪  sit / blink / side / sleep / happy / call", 20)
+    text(d, (40, y), "猫咪  sit / blink / side / sit_up / sleep / happy / call", 20)
     y += 28
     row = compose_strip(
-        ["cat/sit.png", "cat/sit_blink.png", "cat/sit_side.png", "cat/sleep.png", "cat/happy.png", "cat/call.png"],
+        ["cat/sit.png", "cat/sit_blink.png", "cat/sit_side.png", "cat/sit_up.png", "cat/sleep.png", "cat/happy.png", "cat/call.png"],
         3, gap=10, pad=6,
     )
     c.paste(row, (40, y), row)
     y += row.height + 16
-    text(d, (40, y), "走路 walk ×4", 20)
+    text(d, (40, y), "走路 四向 walk_down / walk_up / walk_side ×4（侧向左右共用，游戏里水平翻转）", 20)
     y += 26
-    walk = compose_strip([f"cat/walk_{i}.png" for i in range(4)], 3, gap=8, pad=6)
-    c.paste(walk, (40, y), walk)
-    y += walk.height + 16
+    for label, prefix in (("向屏幕 walk_down", "walk_down"), ("背对 walk_up", "walk_up"), ("侧面 walk_side", "walk_side")):
+        text(d, (48, y), label, 14, MUTED)
+        y += 20
+        walk = compose_strip([f"cat/{prefix}_{i}.png" for i in range(4)], 3, gap=8, pad=6)
+        c.paste(walk, (40, y), walk)
+        y += walk.height + 10
     text(d, (40, y), "吃 eat ×4    跳/扑 jump ×4", 20)
     y += 26
     ej = compose_strip([f"cat/eat_{i}.png" for i in range(4)] + [f"cat/jump_{i}.png" for i in range(4)], 3, gap=8, pad=6)
@@ -188,7 +191,7 @@ def preview_sheet():
         pass
     c.paste(mock, (40, y), mock)
     y += mock.height + 32
-    text(d, (40, y), "导出 PNG 时请只导出 pixel 图层（隐藏「原图」参考层）。这些素材用于未来的像素风格版本，当前 3D 游戏尚未改成像素玩法。", 15, MUTED)
+    text(d, (40, y), "导出 PNG 时请只导出 pixel 图层（隐藏「原图」参考层）。v0.2.7 起这些素材已用于 2D 主场景；v0.2.8 起猫咪走路为四向（前 / 后 / 侧）。", 15, MUTED)
     y += 36
 
     out = c.crop((0, 0, W, y + 16))
@@ -208,11 +211,24 @@ def showcases():
     bg.convert("RGB").save(p)
     print("wrote", p)
 
-    # walk strip 5x
-    walk = compose_strip([f"cat/walk_{i}.png" for i in range(4)], 5, gap=12, pad=24)
+    # 4-directional walk sheet (also copied into assets/pixel)
+    rows = []
+    for prefix in ("walk_down", "walk_up", "walk_side"):
+        rows.append(compose_strip([f"cat/{prefix}_{i}.png" for i in range(4)], 5, gap=12, pad=16))
+    idles = compose_strip(["cat/idle_down.png", "cat/sit_up.png", "cat/idle_side.png"], 5, gap=12, pad=16)
+    rows.append(idles)
+    w = max(r.width for r in rows) + 16
+    h = sum(r.height for r in rows) + 40
+    sheet = new_canvas(w, h)
+    yy = 8
+    for r in rows:
+        sheet.paste(r, (8, yy), r)
+        yy += r.height + 8
     p = SHOT / "pixel_preview_cat_walk.png"
-    walk.convert("RGB").save(p)
+    sheet.convert("RGB").save(p)
     print("wrote", p)
+    (PIX / "preview_walk_dirs.png").write_bytes((SHOT / "pixel_preview_cat_walk.png").read_bytes()) if False else sheet.convert("RGB").save(PIX / "preview_walk_dirs.png")
+    print("wrote", PIX / "preview_walk_dirs.png")
 
     # foods 6x
     food = compose_strip(

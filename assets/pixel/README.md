@@ -1,6 +1,6 @@
 # 治愈猫 · 像素资源包（起步包）
 
-这是一套给**未来像素风格版本**准备的原创像素素材，还没有接到当前的 3D Godot 游戏里，也没有改玩法。
+这是治愈猫 2D 像素版（v0.2.7 起）使用的原创像素素材。
 
 风格参考了《星露谷物语》那种温暖、好认的 16-bit 小品（有限暖色盘、清晰外轮廓、两到三档明暗），但全部是重新绘制的，**没有描摹、拆解或使用任何星露谷或其他商业游戏的精灵图**。
 
@@ -15,7 +15,7 @@
 libresprite -b --layer pixel cat/sit.aseprite --save-as cat/sit.png
 ```
 
-仓库里已经附带了对应的 PNG（硬边缘、透明底、无抗锯齿，适合 nearest-neighbor 放大）。预览总图见 `preview_sheet.png`，放大展示图在仓库根目录的 `screenshots/pixel_preview_*.png`。
+仓库里已经附带了对应的 PNG（硬边缘、透明底、无抗锯齿，适合 nearest-neighbor 放大）。预览总图见 `preview_sheet.png`，四向走路见 `preview_walk_dirs.png`，放大展示图在仓库根目录的 `screenshots/pixel_preview_*.png`。
 
 ## 尺寸约定
 
@@ -39,7 +39,7 @@ libresprite -b --layer pixel cat/sit.aseprite --save-as cat/sit.png
 ```
 assets/pixel/
   originals/     3D 游戏截图原图（对照用，随仓库提交）
-  cat/           坐、眨眼、侧坐、走（4 帧）、吃（4 帧）、跳/扑（4 帧）、睡、开心、打招呼
+  cat/           坐、眨眼、侧坐、背坐；四向走路 walk_down / walk_up / walk_side（各 4 帧）；吃、跳/扑、睡、开心、打招呼；以及 idle_down / idle_up / idle_side
   room/          地板、墙、踢脚线、地毯、灯、纸箱、坐垫
   food/          小鱼干、猫粮碗（满/空）、罐头、牛奶碟（满/空）
   toys/          逗猫棒、毛线球、激光点、毛毡小老鼠
@@ -51,7 +51,7 @@ assets/pixel/
   tools/         生成与打包脚本
 ```
 
-动画类文件（`walk` / `eat` / `jump` / `sparkle`）的 `.aseprite` 里含多帧；同时导出了 `name_0.png`、`name_1.png`…
+动画类文件（`walk_down` / `walk_up` / `walk_side` / `eat` / `jump` / `sparkle`）的 `.aseprite` 里含多帧；同时导出了 `name_0.png`、`name_1.png`… 侧向左右共用 `walk_side`，游戏里对左走做水平翻转，正面和背面绝不翻转。
 
 ## 调色板（主色）
 

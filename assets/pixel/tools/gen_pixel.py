@@ -543,6 +543,246 @@ def draw_cat_side(frame=0, action="walk") -> C:
     return c
 
 
+
+def _tail_peek(c: C, cx: int, cy: int, side: int = 1, raise_: int = 0) -> None:
+    """Small tail peeking beside the hips, used for the front walk."""
+    x = cx + side * 15
+    y = cy + 3 - raise_
+    c.ellipse(x, y, 3.2, 3.6, col("fur"))
+    c.ellipse(x + side * 3, y - 3, 2.8, 3.0, col("fur"))
+    c.ellipse(x + side * 4, y - 7, 2.4, 2.6, col("fur"))
+    c.ellipse(x + side * 3, y - 3, 1.8, 1.8, col("stripe"))
+    c.p(x + side * 4, y - 8, col("fur_l"))
+
+
+def _ears_back(c: C, cx: int, cy: int, perk: int = 0) -> None:
+    """Back of the ears — mostly fur, a hint of pink on the outer rim."""
+    tip_l = (cx - 14, cy - 20 - perk)
+    c.tri((cx - 18, cy - 8), tip_l, (cx - 7, cy - 10), col("fur"))
+    c.tri((cx - 16, cy - 9), (cx - 14, cy - 16 - perk), (cx - 10, cy - 10), col("fur_d"))
+    c.p(cx - 15, cy - 15 - perk, col("ear"))
+    tip_r = (cx + 14, cy - 20 - perk)
+    c.tri((cx + 18, cy - 8), tip_r, (cx + 7, cy - 10), col("fur"))
+    c.tri((cx + 16, cy - 9), (cx + 14, cy - 16 - perk), (cx + 10, cy - 10), col("fur_d"))
+    c.p(cx + 15, cy - 15 - perk, col("ear"))
+    c.p(tip_l[0], tip_l[1], col("fur_d"))
+    c.p(tip_r[0], tip_r[1], col("fur_d"))
+
+
+def _head_back(c: C, cx: int, cy: int, perk: int = 0) -> None:
+    """Back of the head: ears, fur, forehead stripes. No face."""
+    c.ellipse(cx, cy, 20, 16, col("fur"))
+    c.ellipse(cx, cy - 4, 12, 10, col("fur_l"))
+    for dx, w in ((-6, 1.6), (0, 2.0), (6, 1.6)):
+        c.ellipse(cx + dx, cy - 6, w, 4.0, col("stripe"))
+    c.ellipse(cx, cy - 6, 14, 8, col("fur"))
+    c.ellipse(cx - 3, cy - 8, 8, 5, col("fur_l"))
+    _ears_back(c, cx, cy, perk=perk)
+
+
+def _tail_back(c: C, cx: int, y_base: int, swing: int = 0, raise_: int = 0) -> None:
+    """Tail rooted at the rump, curling to one side — stays below the head."""
+    s = 1 if swing >= 0 else -1
+    mag = abs(swing)
+    segs = [
+        (cx, y_base),
+        (cx + s * (3 + mag // 2), y_base + 2),
+        (cx + s * (7 + mag), y_base - 1 - raise_),
+        (cx + s * (8 + mag), y_base - 6 - raise_),
+        (cx + s * (5 + mag), y_base - 10 - raise_),
+    ]
+    prev = segs[0]
+    r = 3.4
+    for i, pt in enumerate(segs):
+        c.ellipse(pt[0], pt[1], r, r * 0.9, col("fur_d") if i == 0 else col("fur"))
+        c.ellipse((prev[0] + pt[0]) / 2, (prev[1] + pt[1]) / 2, r, r * 0.85, col("fur"))
+        prev = pt
+        r = max(2.0, r - 0.3)
+    c.ellipse(segs[1][0], segs[1][1], 2.2, 2.0, col("stripe"))
+    c.ellipse(segs[3][0], segs[3][1], 1.8, 1.6, col("stripe"))
+    c.p(segs[-1][0], segs[-1][1] - 1, col("fur_l"))
+
+
+def draw_cat_walk_down(frame: int) -> C:
+    """Front walk (toward the camera). 4-frame bounce with stepping paws."""
+    c = C(64, 64)
+    cx, ground = 32, 61
+    bounce = [0, -3, 0, -2][frame % 4]
+    sway = [0, 1, 0, -1][frame % 4]
+    body_cy = 49 + bounce
+    head_cy = 24 + bounce + (0 if frame % 2 == 0 else -1)
+    tail_side = 1 if frame in (0, 1) else -1
+    _tail_peek(c, cx + sway, body_cy, side=tail_side, raise_=2 if frame % 2 else 0)
+    c.ellipse(cx + sway, body_cy, 14, 10, col("fur"))
+    c.ellipse(cx + sway - 3, body_cy - 3, 9, 7, col("fur_l"))
+    c.ellipse(cx + sway, body_cy - 3, 7, 6, col("white"))
+    # hind socks peeking just behind the front paws (white, not bare fur stubs)
+    # Hind socks tucked under the hips (keep them attached to the body).
+    if frame in (0, 1):
+        c.ellipse(cx + sway + 12, body_cy + 8, 3.0, 2.4, col("white"))
+        c.p(cx + sway + 12, body_cy + 9, col("bean"))
+        c.ellipse(cx + sway - 12, body_cy + 9, 2.6, 2.0, col("fur_d"))
+        c.ellipse(cx + sway - 12, body_cy + 10, 2.2, 1.6, col("white"))
+    else:
+        c.ellipse(cx + sway - 12, body_cy + 8, 3.0, 2.4, col("white"))
+        c.p(cx + sway - 12, body_cy + 9, col("bean"))
+        c.ellipse(cx + sway + 12, body_cy + 9, 2.6, 2.0, col("fur_d"))
+        c.ellipse(cx + sway + 12, body_cy + 10, 2.2, 1.6, col("white"))
+    paws = [
+        ((-11, -7, False), (6, -6, False)),
+        ((-10, -13, True), (5, -7, False)),
+        ((-10, -6, False), (7, -7, False)),
+        ((-11, -7, False), (6, -13, True)),
+    ][frame % 4]
+    for (dx, dy, lifted) in paws:
+        x, y = cx + sway + dx, ground + dy + (bounce if not lifted else bounce - 1)
+        _paw_beans(c, x, y)
+    c.ellipse(cx + sway, head_cy, 19, 16, col("fur"))
+    c.ellipse(cx + sway - 4, head_cy - 4, 12, 10, col("fur_l"))
+    _ears(c, cx + sway, head_cy, perk=1 if frame % 2 else 0)
+    c.ellipse(cx + sway, head_cy - 6, 14, 8, col("fur"))
+    c.ellipse(cx + sway - 3, head_cy - 8, 8, 5, col("fur_l"))
+    _face(c, cx + sway, head_cy, mouth="w", look=sway)
+    c.outline(col("ink"))
+    return c
+
+
+def draw_cat_walk_up(frame: int) -> C:
+    """Back walk (toward the wall). Ears + back + tail, no face."""
+    c = C(64, 64)
+    cx, ground = 32, 61
+    bounce = [0, -3, 0, -2][frame % 4]
+    sway = [0, -1, 0, 1][frame % 4]
+    body_cy = 48 + bounce
+    head_cy = 24 + bounce + (0 if frame % 2 == 0 else -1)
+    # far (front) paws — tucked under the chest, drawn first
+    far = [
+        ((-8, 2), (8, 0)),
+        ((-6, 0), (7, 2)),
+        ((-8, 0), (8, 2)),
+        ((-7, 2), (6, 0)),
+    ][frame % 4]
+    for (dx, dy) in far:
+        c.ellipse(cx + sway + dx, body_cy + 8 + dy, 2.6, 2.2, col("fur_d"))
+        c.ellipse(cx + sway + dx, body_cy + 10 + dy, 2.0, 1.6, col("white"))
+    # body / back
+    c.ellipse(cx + sway, body_cy, 14, 10, col("fur"))
+    c.ellipse(cx + sway, body_cy - 3, 9, 7, col("fur_l"))
+    c.ellipse(cx + sway, body_cy - 1, 2.0, 6, col("stripe"))
+    c.ellipse(cx + sway, body_cy + 5, 1.6, 3.4, col("stripe"))
+    # hind paws (closer)
+    near = [
+        ((-12, 0, False), (8, 1, False)),
+        ((-11, 1, False), (9, -5, True)),
+        ((-12, 1, False), (8, 0, False)),
+        ((-11, -5, True), (9, 1, False)),
+    ][frame % 4]
+    for (dx, dy, lifted) in near:
+        x = cx + sway + dx
+        y = ground - 6 + dy + (bounce if not lifted else bounce - 1)
+        if lifted:
+            c.ellipse(x + 3, y + 2, 3.4, 3.0, col("fur_d"))
+            c.ellipse(x + 3, y + 4, 3.0, 2.4, col("white"))
+            c.p(x + 3, y + 5, col("bean"))
+            c.p(x + 1, y + 3, col("bean"))
+            c.p(x + 5, y + 3, col("bean"))
+        else:
+            c.ellipse(x + 3, y + 3, 3.4, 2.6, col("fur_d"))
+            c.ellipse(x + 3, y + 5, 3.0, 2.2, col("white"))
+            c.p(x + 3, y + 6, col("bean"))
+    _head_back(c, cx + sway, head_cy, perk=1 if frame % 2 else 0)
+    # tail from the rump, curling to alternate sides
+    swing = [-2, 1, 3, 0][frame % 4]
+    _tail_back(c, cx + sway, body_cy + 8, swing=swing, raise_=2 if frame % 2 else 0)
+    c.outline(col("ink"))
+    return c
+
+
+def draw_cat_walk_side(frame: int) -> C:
+    """Improved 3/4 side walk (sprite faces right). Clearer stride + bounce."""
+    c = C(64, 64)
+    bounce = [0, -3, 0, -2][frame % 4]
+    ground = 61
+    bx, by = 30, 44 + bounce
+    # tail follows the stride (up on passing frames)
+    raise_ = 2 if frame % 2 else 0
+    _tail(c, bx - 16, by + 2 - raise_, curl=-1)
+    # body
+    c.ellipse(bx, by, 16, 10, col("fur"))
+    c.ellipse(bx - 2, by - 3, 10, 6, col("fur_l"))
+    c.ellipse(bx + 6, by + 3, 8, 6, col("fur_d"))
+    c.ellipse(bx + 4, by, 6, 5, col("white"))
+    # legs: longer travel so the step reads at 64px
+    # FL FR HL HR  (dx, dy) relative to hip; negative dy = lifted
+    phase = [
+        ((-7, 1), (8, 0), (-9, 0), (9, 1)),
+        ((1, -4), (3, 1), (-3, 1), (4, -3)),
+        ((7, 0), (-7, 1), (9, 1), (-9, 0)),
+        ((3, 1), (1, -4), (4, -3), (-3, 1)),
+    ][frame % 4]
+    hips = [(-4, 6), (7, 6), (-8, 7), (8, 7)]
+    colors_top = [col("fur"), col("fur"), col("fur_d"), col("fur_d")]
+    for i, ((hx, hy), (dx, dy)) in enumerate(zip(hips, phase)):
+        x, y = bx + hx + dx, by + hy + dy
+        c.ellipse(x, y, 3, 5, colors_top[i])
+        c.ellipse(x, y + 5, 2.8, 2.4, col("white"))
+        c.p(x, y + 6, col("bean"))
+        if dy <= -3:
+            # lifted paw: show a couple of toe beans
+            c.p(x - 1, y + 4, col("bean"))
+            c.p(x + 1, y + 4, col("bean"))
+    # head (3/4, slightly bobs)
+    hx, hy = bx + 12, by - 16 + (0 if frame % 2 == 0 else -1)
+    c.ellipse(hx, hy, 14, 13, col("fur"))
+    c.ellipse(hx - 2, hy - 3, 8, 7, col("fur_l"))
+    c.tri((hx - 8, hy - 6), (hx - 7, hy - 18), (hx - 1, hy - 8), col("fur"))
+    c.tri((hx - 7, hy - 8), (hx - 7, hy - 16), (hx - 3, hy - 8), col("ear"))
+    c.tri((hx + 2, hy - 6), (hx + 8, hy - 18), (hx + 10, hy - 6), col("fur"))
+    c.tri((hx + 4, hy - 7), (hx + 8, hy - 16), (hx + 9, hy - 7), col("ear"))
+    c.ellipse(hx, hy - 6, 8, 5, col("fur"))
+    c.ellipse(hx + 2, hy - 6, 1.6, 3.5, col("stripe"))
+    c.ellipse(hx - 2, hy - 5, 1.2, 3.0, col("stripe"))
+    c.ellipse(hx + 2, hy + 4, 8, 6, col("white"))
+    c.ellipse(hx - 10, hy + 3, 2.4, 1.8, col("blush"))
+    c.ellipse(hx + 4, hy - 1, 4.4, 5.2, col("ink2"))
+    c.ellipse(hx + 4, hy - 1, 3.6, 4.4, col("eye_d"))
+    c.ellipse(hx + 4, hy - 1, 3.2, 3.8, col("eye"))
+    c.ellipse(hx + 4, hy + 1, 1.4, 2.0, col("eye_dd"))
+    c.p(hx + 2, hy - 3, col("white"))
+    c.p(hx + 3, hy - 3, col("white"))
+    c.ellipse(hx - 6, hy, 2.2, 3.0, col("ink2"))
+    c.ellipse(hx - 6, hy, 1.6, 2.2, col("eye"))
+    c.rect(hx + 8, hy + 3, 2, 2, col("nose"))
+    c.p(hx + 7, hy + 6, col("ink"))
+    c.p(hx + 8, hy + 7, col("ink"))
+    c.outline(col("ink"))
+    return c
+
+
+def draw_cat_sit_up() -> C:
+    """Idle / sit facing the wall (back view)."""
+    c = C(64, 64)
+    cx, ground = 32, 61
+    body_cy = 50
+    head_cy = 26
+    # haunches
+    c.ellipse(cx, body_cy, 16, 11, col("fur"))
+    c.ellipse(cx, body_cy - 3, 10, 8, col("fur_l"))
+    c.ellipse(cx, body_cy, 2.0, 6, col("stripe"))
+    c.ellipse(cx - 13, ground - 4, 4.0, 2.6, col("fur_d"))
+    c.ellipse(cx + 13, ground - 4, 4.0, 2.6, col("fur_d"))
+    # no face, just the back of the head
+    _head_back(c, cx, head_cy, perk=0)
+    # tail curled to the right, resting
+    _tail(c, 46, 50, curl=1)
+    c.outline(col("ink"))
+    return c
+
+
+def draw_cat_idle_side() -> C:
+    return draw_cat_side(0, action="sit")
+
+
 def draw_cat_eat(frame: int) -> C:
     # head lowered, chew
     bob = [7, 9, 7, 8][frame % 4]
@@ -1232,10 +1472,38 @@ def main():
         PIX / "cat/walk.aseprite",
         64,
         64,
-        [draw_cat_side(i, "walk") for i in range(4)],
+        [draw_cat_walk_side(i) for i in range(4)],
         ref_sit,
         duration=110,
     )
+    pack_sprite(
+        PIX / "cat/walk_side.aseprite",
+        64,
+        64,
+        [draw_cat_walk_side(i) for i in range(4)],
+        ref_sit,
+        duration=110,
+    )
+    pack_sprite(
+        PIX / "cat/walk_down.aseprite",
+        64,
+        64,
+        [draw_cat_walk_down(i) for i in range(4)],
+        ref_sit,
+        duration=110,
+    )
+    pack_sprite(
+        PIX / "cat/walk_up.aseprite",
+        64,
+        64,
+        [draw_cat_walk_up(i) for i in range(4)],
+        ref_sit,
+        duration=110,
+    )
+    pack_sprite(PIX / "cat/sit_up.aseprite", 64, 64, draw_cat_sit_up(), ref_sit)
+    pack_sprite(PIX / "cat/idle_up.aseprite", 64, 64, draw_cat_sit_up(), ref_sit)
+    pack_sprite(PIX / "cat/idle_down.aseprite", 64, 64, draw_cat_sit(), ref_sit)
+    pack_sprite(PIX / "cat/idle_side.aseprite", 64, 64, draw_cat_idle_side(), ref_sit)
     pack_sprite(PIX / "cat/eat.aseprite", 64, 64, [draw_cat_eat(i) for i in range(4)], ref_eat, duration=130)
     pack_sprite(PIX / "cat/jump.aseprite", 64, 64, [draw_cat_jump(i) for i in range(4)], ref_sit, duration=100)
     pack_sprite(PIX / "cat/sleep.aseprite", 64, 64, draw_cat_sleep(), ref_sit)

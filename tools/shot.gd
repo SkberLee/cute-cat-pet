@@ -1,6 +1,6 @@
 extends SceneTree
 ## Dev tool: godot --path . -s res://tools/shot.gd --resolution 540x1200 -- out.png [scenario]
-## scenarios: idle | bubble | walk | zoom | free | pet | pickfeed | pickplay | feed (food=id) | toy (toy=id)
+## scenarios: idle | bubble | walk | walkdir (dir=down|up|left|right|diag) | zoom | free | pet | pickfeed | pickplay | feed (food=id) | toy (toy=id)
 ## extra k=v args (any scenario): cam=x,y zoom=n clip=name t=sec nofloor=1 (hide Room) nohud=1 (hide UI)
 ## clip= plays an animation on the cat and freezes it after t seconds (default 0.4).
 
@@ -34,6 +34,36 @@ func _run() -> void:
 			cat._cooldown = 0.0
 			cat._start_wander(Vector2(250, 120))
 			wait = 2.5
+		"walkdir":
+			cat.set_autonomy_paused(true)
+			cat._cooldown = 0.0
+			var dname := str(opts.get("dir", "down"))
+			var start := Vector2(168, 148)
+			var dest := Vector2(168, 148)
+			match dname:
+				"up":
+					start = Vector2(168, 188)
+					dest = Vector2(168, 104)
+				"left":
+					start = Vector2(240, 156)
+					dest = Vector2(50, 156)
+				"right":
+					start = Vector2(60, 156)
+					dest = Vector2(270, 156)
+				"diag":
+					start = Vector2(80, 118)
+					dest = Vector2(240, 188)
+				_:
+					start = Vector2(168, 110)
+					dest = Vector2(168, 192)
+			cat.position = start
+			cat._start_wander(dest)
+			cat._wander_speed = cat.WALK_SPEED
+			cat._face_dir(dest - start)
+			cat._play_locomotion(false)
+			if cat.speech_bubble:
+				cat.speech_bubble.visible = false
+			wait = float(opts.get("t", "1.13"))
 		"zoom":
 			main.get_node("UI")._enter_zoom()
 			wait = 1.0
@@ -111,7 +141,7 @@ func _run() -> void:
 		await process_frame
 	var cam_node = main.get_node_or_null("World/Camera2D")
 	print("DBG props=", cat._props.map(func(n): return n.global_position))
-	print("DBG cat=", cat.global_position, " cam=", cam_node.position if cam_node else "?")
+	print("DBG cat=", cat.global_position, " cam=", cam_node.position if cam_node else "?", " anim=", cat.anim.animation if cat.anim else "?", " facing=", cat._facing, " flip=", cat.anim.flip_h if cat.anim else "?")
 	var img := root.get_texture().get_image()
 	img.save_png(out)
 	print("SHOT ", out, " win=", root.size, " visible=", root.get_visible_rect().size, " scale=", root.content_scale_factor)

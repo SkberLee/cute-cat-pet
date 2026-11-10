@@ -89,6 +89,7 @@ var _wander_speed: float = WALK_SPEED
 var _blink_timer: float = 2.4
 var _auto_timer: float = 3.5
 var _auto_busy: bool = false
+var _facing: String = "down"  # down, up, left, right
 var _facing_right: bool = false
 var _rng := RandomNumberGenerator.new()
 var _save_timer := 0.0
@@ -134,12 +135,27 @@ func get_focus_point() -> Vector2:
 	return get_head_point()
 
 func get_head_point() -> Vector2:
-	var side := 2.0 if _facing_right else -2.0
-	return global_position + Vector2(side, -52)
+	match _facing:
+		"up":
+			return global_position + Vector2(0.0, -50.0)
+		"left":
+			return global_position + Vector2(-8.0, -48.0)
+		"right":
+			return global_position + Vector2(8.0, -48.0)
+		_:
+			return global_position + Vector2(0.0, -52.0)
 
 func get_mouth_point() -> Vector2:
-	var side := 6.0 if _facing_right else -6.0
-	return global_position + Vector2(side, -30)
+	# Mouth is above the paws in 2D (smaller y). Back view has no muzzle, use the nape.
+	match _facing:
+		"up":
+			return global_position + Vector2(0.0, -40.0)
+		"left":
+			return global_position + Vector2(-12.0, -30.0)
+		"right":
+			return global_position + Vector2(12.0, -30.0)
+		_:
+			return global_position + Vector2(0.0, -30.0)
 
 func do_pet() -> void:
 	if not _begin("pet"):
@@ -203,7 +219,7 @@ func _process(delta: float) -> void:
 		_update_wander(delta)
 		return
 	_blink_timer -= delta
-	if _blink_timer <= 0.0 and anim and String(anim.animation) in [CLIP_IDLE, "idle", "sit_side"]:
+	if _blink_timer <= 0.0 and anim and String(anim.animation) in [CLIP_IDLE, "idle", "idle_down"]:
 		_play("sit_blink")
 		_blink_timer = _rng.randf_range(2.6, 5.2)
 	if _cooldown > 0.0 or _autonomy_paused:
@@ -300,10 +316,45 @@ func _play(name: String) -> void:
 		anim.play(name)
 	elif anim.sprite_frames and anim.sprite_frames.has_animation(CLIP_IDLE):
 		anim.play(CLIP_IDLE)
+	_apply_flip()
+
+func _idle_clip_for_facing() -> String:
+	match _facing:
+		"up":
+			return "idle_up"
+		"left", "right":
+			return "idle_side"
+		_:
+			return "idle_down"
+
+func _walk_clip(fast: bool) -> String:
+	var prefix := "run" if fast else "walk"
+	match _facing:
+		"up":
+			return prefix + "_up"
+		"left", "right":
+			return prefix + "_side"
+		_:
+			return prefix + "_down"
+
+func _apply_flip() -> void:
+	if anim == null:
+		return
+	# Only flip the side sheet. Never flip front/back.
+	var clip := String(anim.animation)
+	var is_side := clip.ends_with("_side") or clip == "sit_side" or clip == "walk" or clip == "run"
+	anim.flip_h = is_side and _facing == "left"
+
+func _play_locomotion(fast: bool) -> void:
+	var clip := _walk_clip(fast)
+	if anim == null or String(anim.animation) != clip:
+		_play(clip)
+	_apply_flip()
 
 func _play_idle() -> void:
-	_idle_clip = CLIP_IDLE
-	_play(CLIP_IDLE)
+	_idle_clip = _idle_clip_for_facing()
+	_play(_idle_clip)
+	_apply_flip()
 
 func _play_oneshot(clip: String) -> void:
 	_play(clip)
@@ -382,9 +433,7 @@ func _update_wander(delta: float) -> void:
 		return
 	position += to.normalized() * step
 	_face_dir(to)
-	var clip := "run" if _wander_speed > WALK_SPEED + 1.0 else "walk"
-	if anim and String(anim.animation) != clip:
-		_play(clip)
+	_play_locomotion(_wander_speed > WALK_SPEED + 1.0)
 
 func _walk_to(dest: Vector2, speed: float) -> void:
 	dest = _clamp_floor(dest)
@@ -401,19 +450,33 @@ func _walk_to(dest: Vector2, speed: float) -> void:
 			dt = 0.016 * maxf(Engine.time_scale, 1.0)
 		position += to.normalized() * minf(speed * dt, dist)
 		_face_dir(to)
-		var clip := "walk" if speed <= WALK_SPEED + 1.0 else "run"
-		if anim and String(anim.animation) != clip:
-			_play(clip)
+		_play_locomotion(speed > WALK_SPEED + 1.0)
 		frames += 1
 		await get_tree().process_frame
 	if is_inside_tree():
 		position = dest
 
 func _face_dir(dir: Vector2) -> void:
-	if absf(dir.x) > 0.4:
-		_facing_right = dir.x >= 0.0
-		if anim:
-			anim.flip_h = _facing_right
+	if dir.length() <= 0.4:
+		return
+	var ax := absf(dir.x)
+	var ay := absf(dir.y)
+	var next := _facing
+	# Dominant axis with a little hysteresis so diagonals don't flicker.
+	if ay > ax * 1.15:
+		next = "down" if dir.y > 0.0 else "up"
+	elif ax > ay * 1.15:
+		next = "right" if dir.x >= 0.0 else "left"
+	else:
+		var vert := "down" if dir.y > 0.0 else "up"
+		var horz := "right" if dir.x >= 0.0 else "left"
+		if _facing == vert or _facing == horz:
+			next = _facing
+		else:
+			next = vert if ay >= ax else horz
+	_facing = next
+	_facing_right = _facing == "right"
+	_apply_flip()
 
 func _face_point(p: Vector2) -> void:
 	_face_dir(p - global_position)
@@ -450,8 +513,17 @@ func _place_toy(item_id: String) -> Node2D:
 	return n
 
 func _prop_drop() -> Vector2:
-	var ahead := 28.0 if _facing_right else -28.0
-	return _clamp_floor(position + Vector2(ahead, 4.0))
+	var off := Vector2(0.0, 16.0)
+	match _facing:
+		"up":
+			off = Vector2(0.0, -18.0)
+		"left":
+			off = Vector2(-28.0, 4.0)
+		"right":
+			off = Vector2(28.0, 4.0)
+		_:
+			off = Vector2(0.0, 16.0)
+	return _clamp_floor(position + off)
 
 func _add_prop(n: Node2D, pos: Vector2) -> void:
 	var holder := get_parent()
