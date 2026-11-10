@@ -16,6 +16,13 @@ const CLIP_PLAY := "jump"
 
 const WALK_SPEED := 56.0
 const RUN_SPEED := 110.0
+const ACCEL_TIME := 0.28
+const BRAKE_TIME := 0.30
+const STOP_DIST := 2.5
+const TURN_TIME := 0.11
+const TURN_ABOUT_TIME := 0.16
+const SETTLE_TIME := 0.12
+const FACE_HYST := 1.40
 const FLOOR_MIN := Vector2(36, 100)
 const FLOOR_MAX := Vector2(284, 196)
 const SPRITE_OFFSET := Vector2(-32, -62)
@@ -91,6 +98,13 @@ var _auto_timer: float = 3.5
 var _auto_busy: bool = false
 var _facing: String = "down"  # down, up, left, right
 var _facing_right: bool = false
+var _move_speed: float = 0.0
+var _move_dir: Vector2 = Vector2.ZERO
+var _turning: bool = false
+var _turn_timer: float = 0.0
+var _pending_facing: String = ""
+var _settling: bool = false
+var _settle_timer: float = 0.0
 var _rng := RandomNumberGenerator.new()
 var _save_timer := 0.0
 var _player: AudioStreamPlayer
@@ -129,7 +143,11 @@ func is_busy_action() -> bool:
 func set_autonomy_paused(paused: bool) -> void:
 	_autonomy_paused = paused
 	if paused and action_phase == "":
-		_wandering = false
+		if _wandering or _move_speed > 1.0:
+			_wandering = false
+			_begin_settle()
+		else:
+			_wandering = false
 
 func get_focus_point() -> Vector2:
 	return get_head_point()
@@ -217,6 +235,9 @@ func _process(delta: float) -> void:
 		return
 	if _wandering:
 		_update_wander(delta)
+		return
+	if _settling:
+		_tick_settle(delta)
 		return
 	_blink_timer -= delta
 	if _blink_timer <= 0.0 and anim and String(anim.animation) in [CLIP_IDLE, "idle", "idle_down"]:
@@ -347,12 +368,22 @@ func _apply_flip() -> void:
 
 func _play_locomotion(fast: bool) -> void:
 	var clip := _walk_clip(fast)
-	if anim == null or String(anim.animation) != clip:
-		_play(clip)
+	if not _turning:
+		if anim == null or String(anim.animation) != clip:
+			_play(clip)
 	_apply_flip()
+	if anim:
+		var cruise := RUN_SPEED if fast else WALK_SPEED
+		anim.speed_scale = clampf(_move_speed / maxf(cruise, 1.0), 0.35, 1.15)
 
 func _play_idle() -> void:
+	_settling = false
+	_turning = false
+	_pending_facing = ""
+	_move_speed = 0.0
 	_idle_clip = _idle_clip_for_facing()
+	if anim:
+		anim.speed_scale = 1.0
 	_play(_idle_clip)
 	_apply_flip()
 
@@ -374,6 +405,9 @@ func _on_anim_finished(_anim_name: StringName = &"") -> void:
 func _cancel_autonomy() -> void:
 	_wandering = false
 	_auto_busy = false
+	_settling = false
+	_turning = false
+	_pending_facing = ""
 
 func _choose_autonomy() -> void:
 	_auto_timer = _rng.randf_range(1.5, 3.5)
@@ -402,70 +436,127 @@ func _start_wander(target = null) -> void:
 		dest = target
 	elif target is Vector3:
 		# Map legacy 3D (x, z) into the pixel floor.
-		var t: Vector3 = target
-		var nx := inverse_lerp(-2.3, 2.3, t.x)
-		var ny := inverse_lerp(-1.55, 1.55, t.z)
+		var t3: Vector3 = target
+		var nx := inverse_lerp(-2.3, 2.3, t3.x)
+		var ny := inverse_lerp(-1.55, 1.55, t3.z)
 		dest = Vector2(lerp(FLOOR_MIN.x, FLOOR_MAX.x, nx), lerp(FLOOR_MIN.y, FLOOR_MAX.y, ny))
 	else:
 		dest = _random_floor()
 	dest = _clamp_floor(dest)
-	if dest.distance_to(position) <= 2.0:
+	if dest.distance_to(position) <= STOP_DIST:
 		return
 	_wander_target = dest
 	_wandering = true
+	_settling = false
 	_wander_speed = WALK_SPEED if _rng.randf() > 0.25 else RUN_SPEED
 
 func _update_wander(delta: float) -> void:
 	if not _wandering:
 		return
-	var to := _wander_target - position
-	var dist := to.length()
-	if dist <= 2.0:
+	if _locomote_step(_wander_target, _wander_speed, delta):
 		_wandering = false
-		_play_idle()
+		_begin_settle()
 		_auto_timer = _rng.randf_range(1.2, 2.8)
-		return
-	var step := _wander_speed * delta
-	if step >= dist:
-		position = _wander_target
-		_wandering = false
-		_play_idle()
-		return
-	position += to.normalized() * step
-	_face_dir(to)
-	_play_locomotion(_wander_speed > WALK_SPEED + 1.0)
 
 func _walk_to(dest: Vector2, speed: float) -> void:
 	dest = _clamp_floor(dest)
 	var frames := 0
 	while is_inside_tree() and frames < 720:
-		var to := dest - position
-		var dist := to.length()
-		if dist <= 2.0:
-			position = dest
-			break
 		var dt := get_process_delta_time()
 		# Headless / script smokes can emit tiny deltas; keep motion moving.
 		if dt < 0.008:
 			dt = 0.016 * maxf(Engine.time_scale, 1.0)
-		position += to.normalized() * minf(speed * dt, dist)
-		_face_dir(to)
-		_play_locomotion(speed > WALK_SPEED + 1.0)
+		if _locomote_step(dest, speed, dt):
+			break
 		frames += 1
 		await get_tree().process_frame
 	if is_inside_tree():
-		position = dest
+		await _await_settle()
 
-func _face_dir(dir: Vector2) -> void:
-	if dir.length() <= 0.4:
+func _locomote_step(dest: Vector2, cruise: float, delta: float) -> bool:
+	# Returns true once the cat has arrived and is nearly still. Never teleports.
+	var to := dest - position
+	var dist := to.length()
+	var accel := maxf(cruise / ACCEL_TIME, 160.0)
+	var decel := maxf(cruise / BRAKE_TIME, 150.0)
+	var brake := (_move_speed * _move_speed) / (2.0 * decel) + STOP_DIST
+	var want := 0.0 if dist <= brake else cruise
+	if _move_speed < want:
+		_move_speed = minf(want, _move_speed + accel * delta)
+	else:
+		_move_speed = maxf(want, _move_speed - decel * delta)
+	if dist <= STOP_DIST and _move_speed <= 8.0:
+		if dist > 0.01:
+			position = dest
+		_move_speed = 0.0
+		return true
+	if dist > 0.001:
+		_move_dir = to.normalized()
+		position += _move_dir * minf(_move_speed * delta, dist)
+	_queue_face(_move_dir)
+	_tick_turn(delta)
+	_play_locomotion(cruise > WALK_SPEED + 1.0)
+	return false
+
+func _queue_face(dir: Vector2) -> void:
+	var next := _facing_from_dir(dir)
+	if next == "":
 		return
+	if next == _facing:
+		if not _turning:
+			_pending_facing = ""
+		return
+	if _turning and _pending_facing == next:
+		return
+	_pending_facing = next
+	_turning = true
+	var about := (_facing == "left" and next == "right") or (_facing == "right" and next == "left") or (_facing == "up" and next == "down") or (_facing == "down" and next == "up")
+	_turn_timer = TURN_ABOUT_TIME if about else TURN_TIME
+
+func _tick_turn(delta: float) -> void:
+	if not _turning:
+		return
+	_turn_timer -= delta
+	if _turn_timer <= 0.0 and _pending_facing != "":
+		_facing = _pending_facing
+		_facing_right = _facing == "right"
+		_turning = false
+		_pending_facing = ""
+		_apply_flip()
+
+func _begin_settle() -> void:
+	_settling = true
+	_settle_timer = SETTLE_TIME
+	_turning = false
+	_pending_facing = ""
+	if anim:
+		anim.speed_scale = 0.4
+
+func _tick_settle(delta: float) -> void:
+	_settle_timer -= delta
+	if _settle_timer <= 0.0:
+		_play_idle()
+
+func _await_settle() -> void:
+	_begin_settle()
+	var t0 := Time.get_ticks_msec()
+	while is_inside_tree() and _settling and (Time.get_ticks_msec() - t0) / 1000.0 < 0.6:
+		var dt := get_process_delta_time()
+		if dt < 0.008:
+			dt = 0.016 * maxf(Engine.time_scale, 1.0)
+		_tick_settle(dt)
+		await get_tree().process_frame
+
+func _facing_from_dir(dir: Vector2) -> String:
+	if dir.length() <= 0.4:
+		return ""
 	var ax := absf(dir.x)
 	var ay := absf(dir.y)
 	var next := _facing
-	# Dominant axis with a little hysteresis so diagonals don't flicker.
-	if ay > ax * 1.15:
+	# Stronger hysteresis: only change facing when the new axis is clearly dominant.
+	if ay > ax * FACE_HYST:
 		next = "down" if dir.y > 0.0 else "up"
-	elif ax > ay * 1.15:
+	elif ax > ay * FACE_HYST:
 		next = "right" if dir.x >= 0.0 else "left"
 	else:
 		var vert := "down" if dir.y > 0.0 else "up"
@@ -474,8 +565,17 @@ func _face_dir(dir: Vector2) -> void:
 			next = _facing
 		else:
 			next = vert if ay >= ax else horz
+	return next
+
+func _face_dir(dir: Vector2) -> void:
+	# Public/instant facing for tools and look-at; locomotion uses _queue_face.
+	var next := _facing_from_dir(dir)
+	if next == "":
+		return
 	_facing = next
 	_facing_right = _facing == "right"
+	_turning = false
+	_pending_facing = ""
 	_apply_flip()
 
 func _face_point(p: Vector2) -> void:

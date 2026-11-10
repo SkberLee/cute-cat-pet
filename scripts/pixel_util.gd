@@ -23,42 +23,54 @@ static func cat_frames() -> SpriteFrames:
 	var sf := SpriteFrames.new()
 	_add(sf, "sit", ["res://assets/pixel/cat/sit.png"], 1.0, true)
 	_add(sf, "idle", ["res://assets/pixel/cat/sit.png"], 1.0, true)
-	_add(sf, "idle_down", ["res://assets/pixel/cat/idle_down.png"], 1.0, true)
+	_add(sf, "idle_down", ["res://assets/pixel/cat/idle_down_0.png", "res://assets/pixel/cat/idle_down_1.png"], 2.0, true)
 	_add(sf, "sit_blink", ["res://assets/pixel/cat/sit_blink.png"], 6.0, false)
 	_add(sf, "call", ["res://assets/pixel/cat/call.png"], 4.0, false)
 	_add(sf, "happy", ["res://assets/pixel/cat/happy.png"], 4.0, true)
 	_add(sf, "idle_alt", ["res://assets/pixel/cat/happy.png"], 4.0, false)
 	_add(sf, "sleep", ["res://assets/pixel/cat/sleep.png"], 2.0, true)
 	_add(sf, "sit_side", ["res://assets/pixel/cat/sit_side.png"], 1.0, true)
-	_add(sf, "idle_side", ["res://assets/pixel/cat/idle_side.png"], 1.0, true)
+	_add(sf, "idle_side", ["res://assets/pixel/cat/idle_side_0.png", "res://assets/pixel/cat/idle_side_1.png"], 2.0, true)
 	_add(sf, "sit_up", ["res://assets/pixel/cat/sit_up.png"], 1.0, true)
-	_add(sf, "idle_up", ["res://assets/pixel/cat/idle_up.png"], 1.0, true)
+	_add(sf, "idle_up", ["res://assets/pixel/cat/idle_up_0.png", "res://assets/pixel/cat/idle_up_1.png"], 2.0, true)
 	var side := [
 		"res://assets/pixel/cat/walk_side_0.png",
 		"res://assets/pixel/cat/walk_side_1.png",
 		"res://assets/pixel/cat/walk_side_2.png",
 		"res://assets/pixel/cat/walk_side_3.png",
+		"res://assets/pixel/cat/walk_side_4.png",
+		"res://assets/pixel/cat/walk_side_5.png",
+		"res://assets/pixel/cat/walk_side_6.png",
+		"res://assets/pixel/cat/walk_side_7.png",
 	]
 	var down := [
 		"res://assets/pixel/cat/walk_down_0.png",
 		"res://assets/pixel/cat/walk_down_1.png",
 		"res://assets/pixel/cat/walk_down_2.png",
 		"res://assets/pixel/cat/walk_down_3.png",
+		"res://assets/pixel/cat/walk_down_4.png",
+		"res://assets/pixel/cat/walk_down_5.png",
+		"res://assets/pixel/cat/walk_down_6.png",
+		"res://assets/pixel/cat/walk_down_7.png",
 	]
 	var up := [
 		"res://assets/pixel/cat/walk_up_0.png",
 		"res://assets/pixel/cat/walk_up_1.png",
 		"res://assets/pixel/cat/walk_up_2.png",
 		"res://assets/pixel/cat/walk_up_3.png",
+		"res://assets/pixel/cat/walk_up_4.png",
+		"res://assets/pixel/cat/walk_up_5.png",
+		"res://assets/pixel/cat/walk_up_6.png",
+		"res://assets/pixel/cat/walk_up_7.png",
 	]
-	_add(sf, "walk", side, 8.0, true)
-	_add(sf, "walk_side", side, 8.0, true)
-	_add(sf, "walk_down", down, 8.0, true)
-	_add(sf, "walk_up", up, 8.0, true)
-	_add(sf, "run", side, 12.0, true)
-	_add(sf, "run_side", side, 12.0, true)
-	_add(sf, "run_down", down, 12.0, true)
-	_add(sf, "run_up", up, 12.0, true)
+	_add(sf, "walk", side, 10.0, true)
+	_add(sf, "walk_side", side, 10.0, true)
+	_add(sf, "walk_down", down, 10.0, true)
+	_add(sf, "walk_up", up, 10.0, true)
+	_add(sf, "run", side, 15.0, true)
+	_add(sf, "run_side", side, 15.0, true)
+	_add(sf, "run_down", down, 15.0, true)
+	_add(sf, "run_up", up, 15.0, true)
 	_add(sf, "eat", [
 		"res://assets/pixel/cat/eat_0.png",
 		"res://assets/pixel/cat/eat_1.png",

@@ -567,14 +567,14 @@ def _leg_side(c: C, hip_x: int, hip_y: int, foot_x: int, foot_y: int, near: bool
         c.p(foot_x, foot_y, col("bean"))
 
 
-def draw_cat_side(frame=0, action="walk") -> C:
+def draw_cat_side(frame=0, action="walk", bob: int = 0) -> C:
     """Right-facing side cat. action: walk / sit."""
     if action != "sit":
         return draw_cat_walk_side(frame)
     c = C(64, 64)
-    bx, by = 32, 50
+    bx, by = 32, 50 - bob
     ground = 61
-    _tail_side(c, bx - 15, by + 2, raise_=3, extend=0)
+    _tail_side(c, bx - 15, by + 2, raise_=3 + bob, extend=0)
     # Side loaf: high rump on the left, chest on the right.
     c.ellipse(bx - 8, by + 1, 11, 9, col("fur_d"))
     c.ellipse(bx - 2, by, 14, 10, col("fur"))
@@ -597,55 +597,61 @@ def draw_cat_side(frame=0, action="walk") -> C:
     return c
 
 
+def _gait_stride(phase: float, amp: float, lift_h: float, ground: int) -> tuple:
+    """One leg of an 8-beat walk. phase 0 = forward contact, 0.5 = rear lift-off."""
+    t = phase % 1.0
+    if t < 0.5:
+        u = t / 0.5
+        return amp * (1.0 - 2.0 * u), float(ground), False
+    u = (t - 0.5) / 0.5
+    import math
+    return amp * (-1.0 + 2.0 * u), float(ground) - math.sin(u * math.pi) * lift_h, True
+
+
 def draw_cat_walk_side(frame: int) -> C:
-    """Right-facing side walk. Readable stride, tail follow-through, profile head."""
+    """Right-facing 8-frame side walk. Profile head, smooth stride, tail lag."""
     c = C(64, 64)
-    bounce = [0, -3, 0, -2][frame % 4]
-    stretch = [2, 0, 2, 0][frame % 4]
+    f = frame % 8
+    # Contact frames sit lower; passing frames rise. Even in-betweens.
+    bounce = [0, -1, -3, -2, 0, -1, -3, -2][f]
+    stretch = [2, 1, 0, 1, 2, 1, 0, 1][f]
+    # Tail lags the body bob by ~1 frame.
+    raise_ = [0, 1, 2, 4, 1, 2, 3, 5][f]
     ground = 61
     bx, by = 32, 45 + bounce
-    raise_ = [0, 3, 1, 4][frame % 4]
     _tail_side(c, bx - 15, by + 3, raise_=raise_, extend=0)
 
-    # Hips (far slightly back / up so they read as the far side)
     fl_hip = (bx + 10 + stretch, by + 5)
     fr_hip = (bx + 6 + stretch, by + 4)
     hl_hip = (bx - 8 - stretch, by + 6)
     hr_hip = (bx - 12 - stretch, by + 5)
 
-    # (FL, FR, HL, HR) = (foot_x, foot_y, lifted)
-    # Diagonal gait with a real reach on contact frames.
-    phases = [
-        # 0 contact: FL + HR forward
-        ((bx + 21, ground, False), (bx + 4, ground, False), (bx - 19, ground, False), (bx - 4, ground, False)),
-        # 1 passing: FR + HL lifting forward
-        ((bx + 11, ground, False), (bx + 16, ground - 5, True), (bx - 6, ground - 5, True), (bx - 12, ground, False)),
-        # 2 opposite contact: FR + HL forward
-        ((bx + 4, ground, False), (bx + 21, ground, False), (bx - 4, ground, False), (bx - 19, ground, False)),
-        # 3 passing: FL + HR lifting forward
-        ((bx + 16, ground - 5, True), (bx + 11, ground, False), (bx - 12, ground, False), (bx - 6, ground - 5, True)),
-    ]
-    fl, fr, hl, hr = phases[frame % 4]
+    # Diagonal gait: FL with HR, FR with HL. phase 0 = FL/HR forward contact.
+    ph = f / 8.0
+    fl_dx, fl_y, fl_up = _gait_stride(ph, 11.0, 5.0, ground)
+    fr_dx, fr_y, fr_up = _gait_stride(ph + 0.5, 11.0, 5.0, ground)
+    hl_dx, hl_y, hl_up = _gait_stride(ph + 0.5, 11.0, 5.0, ground)
+    hr_dx, hr_y, hr_up = _gait_stride(ph, 11.0, 5.0, ground)
+    fl = (int(round(fl_hip[0] + fl_dx)), int(round(fl_y)), fl_up)
+    fr = (int(round(fr_hip[0] + fr_dx)), int(round(fr_y)), fr_up)
+    hl = (int(round(hl_hip[0] + hl_dx)), int(round(hl_y)), hl_up)
+    hr = (int(round(hr_hip[0] + hr_dx)), int(round(hr_y)), hr_up)
 
-    # Far legs under the body
     _leg_side(c, hr_hip[0], hr_hip[1], hr[0], hr[1], near=False, lifted=hr[2])
     _leg_side(c, fr_hip[0], fr_hip[1], fr[0], fr[1], near=False, lifted=fr[2])
 
-    # Body — white is a small chest, not a mid-flank blob
     c.ellipse(bx, by, 16 + stretch, 10, col("fur"))
     c.ellipse(bx - 3, by - 3, 9, 6, col("fur_l"))
     c.ellipse(bx - 9, by + 3, 6, 5, col("fur_d"))
     c.ellipse(bx + 9, by + 2, 5.0, 4.2, col("white"))
     c.ellipse(bx - 3, by, 3.0, 2.2, col("stripe"))
 
-    # Near legs on top of the body
     _leg_side(c, hl_hip[0], hl_hip[1], hl[0], hl[1], near=True, lifted=hl[2])
     _leg_side(c, fl_hip[0], fl_hip[1], fl[0], fl[1], near=True, lifted=fl[2])
 
-    # Head on the front of the shoulders, slight bob
     hx = bx + 13 + stretch
-    hy = by - 16 + (0 if frame % 2 == 0 else -1)
-    _head_side(c, hx, hy, perk=1 if frame % 2 else 0)
+    hy = by - 16 + (0 if bounce >= -1 else -1)
+    _head_side(c, hx, hy, perk=1 if bounce <= -2 else 0)
     c.outline(col("ink"))
     return c
 
@@ -710,42 +716,51 @@ def _tail_back(c: C, cx: int, y_base: int, swing: int = 0, raise_: int = 0) -> N
 
 
 def draw_cat_walk_down(frame: int) -> C:
-    """Front walk (toward the camera). 4-frame bounce with stepping paws."""
+    """Front walk, 8-frame bounce with a clearer left/right stride."""
     c = C(64, 64)
+    f = frame % 8
     cx, ground = 32, 61
-    bounce = [0, -3, 0, -2][frame % 4]
-    sway = [0, 1, 0, -1][frame % 4]
+    bounce = [0, -1, -2, -1, 0, -1, -2, -1][f]
+    sway = [0, 1, 2, 1, 0, -1, -2, -1][f]
     body_cy = 49 + bounce
-    head_cy = 24 + bounce + (0 if frame % 2 == 0 else -1)
-    tail_side = 1 if frame in (0, 1) else -1
-    _tail_peek(c, cx + sway, body_cy, side=tail_side, raise_=2 if frame % 2 else 0)
+    head_cy = 24 + bounce + (0 if bounce >= -1 else -1)
+    # Tail lags and eases from right to left across the cycle.
+    tail_side = 1 if f < 4 else -1
+    tail_raise = [0, 1, 3, 2, 0, 1, 3, 2][f]
+    _tail_peek(c, cx + sway, body_cy, side=tail_side, raise_=tail_raise)
     c.ellipse(cx + sway, body_cy, 14, 10, col("fur"))
     c.ellipse(cx + sway - 3, body_cy - 3, 9, 7, col("fur_l"))
     c.ellipse(cx + sway, body_cy - 3, 7, 6, col("white"))
-    # hind socks peeking just behind the front paws (white, not bare fur stubs)
-    # Hind socks tucked under the hips (keep them attached to the body).
-    if frame in (0, 1):
-        c.ellipse(cx + sway + 12, body_cy + 8, 3.0, 2.4, col("white"))
-        c.p(cx + sway + 12, body_cy + 9, col("bean"))
-        c.ellipse(cx + sway - 12, body_cy + 9, 2.6, 2.0, col("fur_d"))
-        c.ellipse(cx + sway - 12, body_cy + 10, 2.2, 1.6, col("white"))
-    else:
-        c.ellipse(cx + sway - 12, body_cy + 8, 3.0, 2.4, col("white"))
-        c.p(cx + sway - 12, body_cy + 9, col("bean"))
-        c.ellipse(cx + sway + 12, body_cy + 9, 2.6, 2.0, col("fur_d"))
-        c.ellipse(cx + sway + 12, body_cy + 10, 2.2, 1.6, col("white"))
-    paws = [
-        ((-11, -7, False), (6, -6, False)),
-        ((-10, -13, True), (5, -7, False)),
-        ((-10, -6, False), (7, -7, False)),
-        ((-11, -7, False), (6, -13, True)),
-    ][frame % 4]
-    for (dx, dy, lifted) in paws:
-        x, y = cx + sway + dx, ground + dy + (bounce if not lifted else bounce - 1)
-        _paw_beans(c, x, y)
+    # Hind socks: opposite the same-side front paw.
+    hind_l_up = f >= 4
+    hind_r_up = f < 4
+    for sign, up in ((-1, hind_l_up), (1, hind_r_up)):
+        hx = cx + sway + sign * (11 if up else 13)
+        hy = body_cy + (8 if up else 10)
+        c.ellipse(hx, hy, 2.8, 2.2, col("fur_d") if not up else col("white"))
+        c.ellipse(hx, hy + 1, 2.2, 1.6, col("white"))
+        if up:
+            c.p(hx, hy + 1, col("bean"))
+    # Front paws: left stance on 0-3, right stance on 4-7, with in-betweens.
+    def front_paw(phase_t: float):
+        dx, yoff, lifted = _gait_stride(phase_t, 3.0, 6.0, 0)
+        return int(round(-11 + dx)), int(round(-7 - (6.0 - yoff) if lifted else -6)), lifted
+    # left uses phase f/8, right is opposite
+    for phase, x_sign in ((f / 8.0, -1), (f / 8.0 + 0.5, 1)):
+        tph = phase % 1.0
+        dx, y, lifted = _gait_stride(tph, 3.5, 6.0, ground - 6)
+        # mirror x around the body for the right paw
+        if x_sign > 0:
+            px = cx + sway + 6 + int(round(dx))
+        else:
+            px = cx + sway - 11 + int(round(dx))
+        py = int(round(y)) + (bounce if not lifted else bounce - 1)
+        if lifted:
+            py = min(py, ground - 11)
+        _paw_beans(c, px, py)
     c.ellipse(cx + sway, head_cy, 19, 16, col("fur"))
     c.ellipse(cx + sway - 4, head_cy - 4, 12, 10, col("fur_l"))
-    _ears(c, cx + sway, head_cy, perk=1 if frame % 2 else 0)
+    _ears(c, cx + sway, head_cy, perk=1 if bounce <= -2 else 0)
     c.ellipse(cx + sway, head_cy - 6, 14, 8, col("fur"))
     c.ellipse(cx + sway - 3, head_cy - 8, 8, 5, col("fur_l"))
     _face(c, cx + sway, head_cy, mouth="w", look=sway)
@@ -754,62 +769,54 @@ def draw_cat_walk_down(frame: int) -> C:
 
 
 def draw_cat_walk_up(frame: int) -> C:
-    """Back walk (toward the wall). Ears + back + tail, no face."""
+    """Back walk, 8-frame stride. Ears + back + tail, no face."""
     c = C(64, 64)
+    f = frame % 8
     cx, ground = 32, 61
-    bounce = [0, -3, 0, -2][frame % 4]
-    sway = [0, -1, 0, 1][frame % 4]
+    bounce = [0, -1, -2, -1, 0, -1, -2, -1][f]
+    sway = [0, -1, -2, -1, 0, 1, 2, 1][f]
     body_cy = 48 + bounce
-    head_cy = 24 + bounce + (0 if frame % 2 == 0 else -1)
-    # far (front) paws — tucked under the chest, drawn first
-    far = [
-        ((-8, 2), (8, 0)),
-        ((-6, 0), (7, 2)),
-        ((-8, 0), (8, 2)),
-        ((-7, 2), (6, 0)),
-    ][frame % 4]
-    for (dx, dy) in far:
-        c.ellipse(cx + sway + dx, body_cy + 8 + dy, 2.6, 2.2, col("fur_d"))
-        c.ellipse(cx + sway + dx, body_cy + 10 + dy, 2.0, 1.6, col("white"))
-    # body / back
+    head_cy = 24 + bounce + (0 if bounce >= -1 else -1)
+    # Far (front) paws under the chest, opposite the hind pair.
+    for sign, phase in ((-1, f / 8.0 + 0.5), (1, f / 8.0)):
+        dx, y, lifted = _gait_stride(phase, 3.0, 3.0, 0)
+        x = cx + sway + sign * 8 + int(round(dx * 0.4))
+        yy = body_cy + 9 + (0 if not lifted else -2)
+        c.ellipse(x, yy, 2.6, 2.2, col("fur_d"))
+        c.ellipse(x, yy + 2, 2.0, 1.6, col("white"))
     c.ellipse(cx + sway, body_cy, 14, 10, col("fur"))
     c.ellipse(cx + sway, body_cy - 3, 9, 7, col("fur_l"))
     c.ellipse(cx + sway, body_cy - 1, 2.0, 6, col("stripe"))
     c.ellipse(cx + sway, body_cy + 5, 1.6, 3.4, col("stripe"))
-    # hind paws (closer)
-    near = [
-        ((-12, 0, False), (8, 1, False)),
-        ((-11, 1, False), (9, -5, True)),
-        ((-12, 1, False), (8, 0, False)),
-        ((-11, -5, True), (9, 1, False)),
-    ][frame % 4]
-    for (dx, dy, lifted) in near:
-        x = cx + sway + dx
-        y = ground - 6 + dy + (bounce if not lifted else bounce - 1)
+    # Hind paws closer to camera
+    for sign, phase in ((-1, f / 8.0), (1, f / 8.0 + 0.5)):
+        dx, y, lifted = _gait_stride(phase, 4.0, 5.0, ground - 6)
+        x = cx + sway + sign * 11 + int(round(dx * 0.5))
+        yy = int(round(y)) + (bounce if not lifted else bounce - 1)
         if lifted:
-            c.ellipse(x + 3, y + 2, 3.4, 3.0, col("fur_d"))
-            c.ellipse(x + 3, y + 4, 3.0, 2.4, col("white"))
-            c.p(x + 3, y + 5, col("bean"))
-            c.p(x + 1, y + 3, col("bean"))
-            c.p(x + 5, y + 3, col("bean"))
+            c.ellipse(x, yy + 2, 3.4, 3.0, col("fur_d"))
+            c.ellipse(x, yy + 4, 3.0, 2.4, col("white"))
+            c.p(x, yy + 5, col("bean"))
+            c.p(x - 2, yy + 3, col("bean"))
+            c.p(x + 2, yy + 3, col("bean"))
         else:
-            c.ellipse(x + 3, y + 3, 3.4, 2.6, col("fur_d"))
-            c.ellipse(x + 3, y + 5, 3.0, 2.2, col("white"))
-            c.p(x + 3, y + 6, col("bean"))
-    _head_back(c, cx + sway, head_cy, perk=1 if frame % 2 else 0)
-    # tail from the rump, curling to alternate sides
-    swing = [-2, 1, 3, 0][frame % 4]
-    _tail_back(c, cx + sway, body_cy + 8, swing=swing, raise_=2 if frame % 2 else 0)
+            c.ellipse(x, yy + 3, 3.4, 2.6, col("fur_d"))
+            c.ellipse(x, yy + 5, 3.0, 2.2, col("white"))
+            c.p(x, yy + 6, col("bean"))
+    _head_back(c, cx + sway, head_cy, perk=1 if bounce <= -2 else 0)
+    # Tail lags the sway so it follows through.
+    lag = [0, -1, -2, -1, 0, 1, 3, 2][f]
+    _tail_back(c, cx + sway, body_cy + 8, swing=lag, raise_=[0, 1, 3, 2, 0, 1, 3, 2][f])
     c.outline(col("ink"))
     return c
 
 
-def draw_cat_sit_up() -> C:
+def draw_cat_sit_up(bob: int = 0) -> C:
     """Idle / sit facing the wall (back view)."""
     c = C(64, 64)
     cx, ground = 32, 61
-    body_cy = 50
-    head_cy = 26
+    body_cy = 50 - bob
+    head_cy = 26 - bob
     # haunches
     c.ellipse(cx, body_cy, 16, 11, col("fur"))
     c.ellipse(cx, body_cy - 3, 10, 8, col("fur_l"))
@@ -824,8 +831,16 @@ def draw_cat_sit_up() -> C:
     return c
 
 
-def draw_cat_idle_side() -> C:
-    return draw_cat_side(0, action="sit")
+def draw_cat_idle_side(bob: int = 0) -> C:
+    return draw_cat_side(0, action="sit", bob=bob)
+
+
+def draw_cat_idle_down(bob: int = 0) -> C:
+    return draw_cat_sit(head_dy=-bob, squash=-bob)
+
+
+def draw_cat_idle_up(bob: int = 0) -> C:
+    return draw_cat_sit_up(bob=bob)
 
 
 def draw_cat_eat(frame: int) -> C:
@@ -1517,7 +1532,7 @@ def main():
         PIX / "cat/walk.aseprite",
         64,
         64,
-        [draw_cat_walk_side(i) for i in range(4)],
+        [draw_cat_walk_side(i) for i in range(8)],
         ref_sit,
         duration=110,
     )
@@ -1525,7 +1540,7 @@ def main():
         PIX / "cat/walk_side.aseprite",
         64,
         64,
-        [draw_cat_walk_side(i) for i in range(4)],
+        [draw_cat_walk_side(i) for i in range(8)],
         ref_sit,
         duration=110,
     )
@@ -1533,7 +1548,7 @@ def main():
         PIX / "cat/walk_down.aseprite",
         64,
         64,
-        [draw_cat_walk_down(i) for i in range(4)],
+        [draw_cat_walk_down(i) for i in range(8)],
         ref_sit,
         duration=110,
     )
@@ -1541,14 +1556,14 @@ def main():
         PIX / "cat/walk_up.aseprite",
         64,
         64,
-        [draw_cat_walk_up(i) for i in range(4)],
+        [draw_cat_walk_up(i) for i in range(8)],
         ref_sit,
         duration=110,
     )
     pack_sprite(PIX / "cat/sit_up.aseprite", 64, 64, draw_cat_sit_up(), ref_sit)
-    pack_sprite(PIX / "cat/idle_up.aseprite", 64, 64, draw_cat_sit_up(), ref_sit)
-    pack_sprite(PIX / "cat/idle_down.aseprite", 64, 64, draw_cat_sit(), ref_sit)
-    pack_sprite(PIX / "cat/idle_side.aseprite", 64, 64, draw_cat_idle_side(), ref_sit)
+    pack_sprite(PIX / "cat/idle_up.aseprite", 64, 64, [draw_cat_idle_up(0), draw_cat_idle_up(1)], ref_sit, duration=500)
+    pack_sprite(PIX / "cat/idle_down.aseprite", 64, 64, [draw_cat_idle_down(0), draw_cat_idle_down(1)], ref_sit, duration=500)
+    pack_sprite(PIX / "cat/idle_side.aseprite", 64, 64, [draw_cat_idle_side(0), draw_cat_idle_side(1)], ref_sit, duration=500)
     pack_sprite(PIX / "cat/eat.aseprite", 64, 64, [draw_cat_eat(i) for i in range(4)], ref_eat, duration=130)
     pack_sprite(PIX / "cat/jump.aseprite", 64, 64, [draw_cat_jump(i) for i in range(4)], ref_sit, duration=100)
     pack_sprite(PIX / "cat/sleep.aseprite", 64, 64, draw_cat_sleep(), ref_sit)

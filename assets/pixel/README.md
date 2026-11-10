@@ -39,7 +39,7 @@ libresprite -b --layer pixel cat/sit.aseprite --save-as cat/sit.png
 ```
 assets/pixel/
   originals/     3D 游戏截图原图（对照用，随仓库提交）
-  cat/           坐、眨眼、侧坐、背坐；四向走路 walk_down / walk_up / walk_side（各 4 帧）；吃、跳/扑、睡、开心、打招呼；以及 idle_down / idle_up / idle_side
+  cat/           坐、眨眼、侧坐、背坐；四向走路 walk_down / walk_up / walk_side（各 8 帧）；吃、跳/扑、睡、开心、打招呼；以及 idle_down / idle_up / idle_side
   room/          地板、墙、踢脚线、地毯、灯、纸箱、坐垫
   food/          小鱼干、猫粮碗（满/空）、罐头、牛奶碟（满/空）
   toys/          逗猫棒、毛线球、激光点、毛毡小老鼠

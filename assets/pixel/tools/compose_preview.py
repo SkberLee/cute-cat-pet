@@ -128,12 +128,12 @@ def preview_sheet():
     )
     c.paste(row, (40, y), row)
     y += row.height + 16
-    text(d, (40, y), "走路 四向 walk_down / walk_up / walk_side ×4（侧向左右共用，游戏里水平翻转）", 20)
+    text(d, (40, y), "走路 四向 walk_down / walk_up / walk_side ×8（侧向左右共用，游戏里水平翻转）", 20)
     y += 26
     for label, prefix in (("向屏幕 walk_down", "walk_down"), ("背对 walk_up", "walk_up"), ("侧面 walk_side", "walk_side")):
         text(d, (48, y), label, 14, MUTED)
         y += 20
-        walk = compose_strip([f"cat/{prefix}_{i}.png" for i in range(4)], 3, gap=8, pad=6)
+        walk = compose_strip([f"cat/{prefix}_{i}.png" for i in range(8)], 2, gap=6, pad=4)
         c.paste(walk, (40, y), walk)
         y += walk.height + 10
     text(d, (40, y), "吃 eat ×4    跳/扑 jump ×4", 20)
@@ -214,8 +214,8 @@ def showcases():
     # 4-directional walk sheet (also copied into assets/pixel)
     rows = []
     for prefix in ("walk_down", "walk_up", "walk_side"):
-        rows.append(compose_strip([f"cat/{prefix}_{i}.png" for i in range(4)], 5, gap=12, pad=16))
-    idles = compose_strip(["cat/idle_down.png", "cat/sit_up.png", "cat/idle_side.png"], 5, gap=12, pad=16)
+        rows.append(compose_strip([f"cat/{prefix}_{i}.png" for i in range(8)], 4, gap=8, pad=12))
+    idles = compose_strip(["cat/idle_down_0.png", "cat/idle_down_1.png", "cat/idle_up_0.png", "cat/idle_up_1.png", "cat/idle_side_0.png", "cat/idle_side_1.png"], 4, gap=12, pad=16)
     rows.append(idles)
     w = max(r.width for r in rows) + 16
     h = sum(r.height for r in rows) + 40
