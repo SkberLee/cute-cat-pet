@@ -19,16 +19,18 @@ func _run() -> void:
 	if cat.speech_bubble:
 		cat.speech_bubble.visible = false
 	# Place once at the start, then only walk — never teleport mid-demo.
-	cat.position = Vector2(70, 130)
+	# Extra time on side (right/left) and front/down walks, plus a back walk.
+	cat.position = Vector2(60, 110)
 	cat._facing = "right"
 	cat._apply_flip()
 	cat._play_idle()
-	await _wait(0.7)
-	await _walk(cat, Vector2(250, 130))
-	await _walk(cat, Vector2(250, 190))
-	await _walk(cat, Vector2(70, 190))
+	await _wait(0.55)
+	await _walk(cat, Vector2(250, 110))
+	await _walk(cat, Vector2(250, 200))
+	await _walk(cat, Vector2(70, 200))
 	await _walk(cat, Vector2(70, 110))
-	await _walk(cat, Vector2(230, 188))
+	await _walk(cat, Vector2(70, 200))
+	await _walk(cat, Vector2(230, 140))
 	await _wait(1.1)
 	# Tell the shell recorder to stop ffmpeg before this window closes.
 	var f := FileAccess.open("/tmp/record/demo_done", FileAccess.WRITE)

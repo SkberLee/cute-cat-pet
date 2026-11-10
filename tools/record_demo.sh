@@ -3,12 +3,12 @@
 set -euo pipefail
 cd /workspace/cute-cat-pet
 export DISPLAY=${DISPLAY:-:7}
-OUT=${1:-/workspace/cute-cat-pet/screenshots/v031_desktop_play.mp4}
-RAW=/tmp/record/v031_raw.mp4
+OUT=${1:-/workspace/cute-cat-pet/screenshots/v032_desktop_play.mp4}
+RAW=/tmp/record/v032_raw.mp4
 mkdir -p /tmp/record /workspace/cute-cat-pet/screenshots
 rm -f "$RAW" /tmp/record/demo_done
 GODOT=/workspace/xt/bin/Godot_v4.7.2-stable_linux.x86_64
-timeout 50 "$GODOT" --path /workspace/cute-cat-pet -s res://tools/record_demo.gd \
+timeout 70 "$GODOT" --path /workspace/cute-cat-pet -s res://tools/record_demo.gd \
   --rendering-driver opengl3 --resolution 540x960 --position 0,0 \
   >/tmp/record/godot.log 2>&1 &
 GPID=$!
@@ -19,7 +19,7 @@ ffmpeg -y -f x11grab -video_size 540x960 -framerate 30 -draw_mouse 0 -i "${DISPL
   >/tmp/record/ffmpeg.log 2>&1 &
 FPID=$!
 # Stop ffmpeg as soon as the demo signals it is done (window still up).
-for i in $(seq 1 80); do
+for i in $(seq 1 140); do
   if [[ -f /tmp/record/demo_done ]]; then
     sleep 0.05
     break
@@ -36,7 +36,7 @@ python3 - << PY
 from pathlib import Path
 import subprocess
 from PIL import Image
-raw = Path("/tmp/record/v031_raw.mp4")
+raw = Path("/tmp/record/v032_raw.mp4")
 out = Path("$OUT")
 if not raw.exists() or raw.stat().st_size < 10000:
     raise SystemExit("raw recording missing or tiny")
