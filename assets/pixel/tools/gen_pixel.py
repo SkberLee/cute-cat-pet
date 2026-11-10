@@ -464,6 +464,11 @@ def draw_cat_sit(blink=False, happy=False, mouth="w", paw_up=False, look=0, head
     c.ellipse(cx - 3, head_cy - 8, 8, 5, col("fur_l"))
     _face(c, cx, head_cy, blink=blink, happy=happy, mouth=mouth, look=look)
     c.outline(col("ink"))
+    if not paw_up:
+        _foot_shadow(c, cx - 9, SOLE_Y, 5.0)
+        _foot_shadow(c, cx + 7, SOLE_Y, 5.0)
+    else:
+        _foot_shadow(c, cx + 9, SOLE_Y, 5.0)
     return c
 
 
@@ -547,24 +552,72 @@ def _tail_side(c: C, x: int, y: int, raise_: int = 0, extend: int = 0) -> None:
     c.p(segs[-1][0], segs[-1][1] - 1, col("fur_l"))
 
 
+SOLE_Y = 60  # bottom pixel of a planted sock; outline sits on 61
+
+
+def _foot_shadow(c: C, x: int, sole_y: int = SOLE_Y, rx: float = 4.0) -> None:
+    """1-2px soft contact shadow under the sole. Only fills empty pixels so
+    it never muddies a planted sock, and is drawn AFTER outline so it is not inked."""
+    sh_lo = (148, 108, 78, 165)
+    sh_hi = (120, 86, 58, 105)
+    def _span(y, rad, colr):
+        for xi in range(int(x - rad - 1), int(x + rad + 2)):
+            if 0 <= xi < c.w and 0 <= y < c.h and c.px[xi, y][3] == 0:
+                if abs(xi + 0.5 - x) <= rad:
+                    c.px[xi, y] = colr
+    _span(sole_y + 1, rx, sh_lo)
+    _span(sole_y + 2, rx * 0.7, sh_hi)
+
+
 def _leg_side(c: C, hip_x: int, hip_y: int, foot_x: int, foot_y: int, near: bool = True, lifted: bool = False) -> None:
-    """One side-view leg from hip to foot. Far legs use a slightly darker fur."""
+    """Side-view leg. Planted: flat sock on SOLE_Y, thicker bent leg, no pads.
+    Lifted: rounded sock with pink pads facing the camera."""
     fur = col("fur") if near else col("fur_d")
-    mx = (hip_x + foot_x) / 2
-    my = (hip_y + foot_y) / 2
-    rx = 2.8 if near else 2.4
-    c.ellipse(mx, my, rx, 5.2, fur)
-    c.ellipse(hip_x, hip_y, rx + 0.3, 2.6, fur)
-    # white sock
-    c.ellipse(foot_x, foot_y - 1, 3.1 if near else 2.7, 2.5, col("white"))
+    rx = 3.3 if near else 2.8
     if lifted:
-        # pads visible on the lifted paw
+        mx = (hip_x + foot_x) / 2
+        my = (hip_y + foot_y) / 2
+        c.ellipse(hip_x, hip_y, rx - 0.2, 2.4, fur)
+        c.ellipse(mx, my, rx - 0.5, 4.0, fur)
+        # rounded sock, sole/pads toward camera
+        c.ellipse(foot_x, foot_y - 1, 2.8 if near else 2.5, 2.5, col("white"))
         c.p(foot_x, foot_y, col("bean"))
         c.p(foot_x - 1, foot_y - 1, col("bean"))
         c.p(foot_x + 1, foot_y - 1, col("bean"))
         c.p(foot_x, foot_y - 2, col("bean_d"))
     else:
-        c.p(foot_x, foot_y, col("bean"))
+        # Load-bearing: slight rear bend, thicker, squashed into a flat sock.
+        # Never let the leg ellipse pierce the sole (hips drop on contact squash).
+        cap = foot_y - 2
+        mid_x = hip_x * 0.4 + foot_x * 0.6
+        mid_y = min(hip_y * 0.35 + foot_y * 0.65, cap - 1.5)
+        hip_ry = min(3.2, max(1.8, cap - (hip_y + 1)))
+        mid_ry = min(3.6, max(2.0, cap - mid_y))
+        c.ellipse(hip_x, hip_y + 1, rx + 0.5, hip_ry, fur)
+        c.ellipse(mid_x, mid_y, rx + 0.4, mid_ry, fur)
+        # Flat white sock; lowest pixel == foot_y (SOLE_Y). No beans.
+        c.ellipse(foot_x, foot_y - 1, 3.7 if near else 3.2, 1.7, col("white"))
+        c.p(foot_x - 2, foot_y - 2, col("white_d"))
+        c.p(foot_x + 2, foot_y - 2, col("white_d"))
+        c.p(foot_x, foot_y - 2, col("white_d"))
+
+
+def _paw_planted_front(c: C, cx: int, sole_y: int = SOLE_Y, fur_col=None) -> None:
+    """Front-view planted paw: top of a white sock sitting on the floor, no pads."""
+    if fur_col is None:
+        fur_col = col("fur")
+    # Short load-bearing ankle column, then a flat sock locked to the sole.
+    c.ellipse(cx, sole_y - 5, 2.6, 2.6, fur_col)
+    c.ellipse(cx, sole_y - 3, 3.0, 2.2, fur_col)
+    c.ellipse(cx, sole_y - 1, 4.0, 1.7, col("white"))
+    c.p(cx - 2, sole_y - 2, col("white_d"))
+    c.p(cx + 2, sole_y - 2, col("white_d"))
+    c.p(cx, sole_y - 2, col("white_d"))
+
+
+def _paw_lifted_front(c: C, cx: int, y: int) -> None:
+    """Front-view lifted paw with pink pads facing the camera."""
+    _paw_beans(c, cx - 3, y)
 
 
 def draw_cat_side(frame=0, action="walk", bob: int = 0) -> C:
@@ -573,7 +626,7 @@ def draw_cat_side(frame=0, action="walk", bob: int = 0) -> C:
         return draw_cat_walk_side(frame)
     c = C(64, 64)
     bx, by = 32, 50 - bob
-    ground = 61
+    sole = SOLE_Y
     _tail_side(c, bx - 15, by + 2, raise_=3 + bob, extend=0)
     # Side loaf: high rump on the left, chest on the right.
     c.ellipse(bx - 8, by + 1, 11, 9, col("fur_d"))
@@ -582,56 +635,59 @@ def draw_cat_side(frame=0, action="walk", bob: int = 0) -> C:
     c.ellipse(bx + 8, by - 4, 7, 6, col("fur"))  # shoulder / neck into the head
     c.ellipse(bx + 8, by + 2, 4.5, 3.8, col("white"))
     c.ellipse(bx - 4, by + 1, 2.8, 2.2, col("stripe"))
-    # hind hip tucked
-    c.ellipse(bx - 12, ground - 5, 6, 4, col("fur_d"))
-    c.ellipse(bx - 12, ground - 3, 4.0, 2.2, col("white"))
-    # front paws tucked, pointing a little to the right
-    c.ellipse(bx + 6, ground - 5, 4.2, 3.0, col("white"))
-    c.ellipse(bx + 12, ground - 5, 4.2, 3.0, col("white"))
-    c.p(bx + 5, ground - 4, col("bean"))
-    c.p(bx + 7, ground - 3, col("bean"))
-    c.p(bx + 11, ground - 3, col("bean"))
-    c.p(bx + 13, ground - 4, col("bean"))
+    # hind hip tucked, sock on the sole line
+    c.ellipse(bx - 12, sole - 3, 6, 3.2, col("fur_d"))
+    c.ellipse(bx - 12, sole - 1, 4.2, 1.8, col("white"))
+    # front paws tucked, flat on the floor, no hovering beans
+    c.ellipse(bx + 6, sole - 1, 4.2, 1.7, col("white"))
+    c.ellipse(bx + 12, sole - 1, 4.2, 1.7, col("white"))
+    c.p(bx + 5, sole - 2, col("white_d"))
+    c.p(bx + 13, sole - 2, col("white_d"))
     _head_side(c, bx + 13, by - 16, perk=0)
     c.outline(col("ink"))
+    _foot_shadow(c, bx - 12, sole, 4.5)
+    _foot_shadow(c, bx + 7, sole, 4.0)
+    _foot_shadow(c, bx + 13, sole, 4.0)
     return c
 
 
-def _gait_stride(phase: float, amp: float, lift_h: float, ground: int) -> tuple:
-    """One leg of an 8-beat walk. phase 0 = forward contact, 0.5 = rear lift-off."""
-    t = phase % 1.0
-    if t < 0.5:
-        u = t / 0.5
-        return amp * (1.0 - 2.0 * u), float(ground), False
-    u = (t - 0.5) / 0.5
+def _gait_stride(phase: float, amp: float, lift_h: float, sole_y: int, duty: float = 0.625) -> tuple:
+    """One leg of an 8-beat walk. duty>0.5 so a walk always has a planted diagonal.
+    Swing frames stay at least 2px off the sole so pads never tick the ground."""
     import math
-    return amp * (-1.0 + 2.0 * u), float(ground) - math.sin(u * math.pi) * lift_h, True
+    t = phase % 1.0
+    if t < duty - 1e-9:
+        u = t / duty
+        return amp * (1.0 - 2.0 * u), float(sole_y), False
+    u = (t - duty) / max(1.0 - duty, 0.001)
+    lift = max(2.5, math.sin(u * math.pi) * lift_h)
+    return amp * (-1.0 + 2.0 * u), float(sole_y) - lift, True
 
 
 def draw_cat_walk_side(frame: int) -> C:
-    """Right-facing 8-frame side walk. Profile head, smooth stride, tail lag."""
+    """Right-facing 8-frame side walk with solid contact and weight shift."""
     c = C(64, 64)
     f = frame % 8
-    # Contact frames sit lower; passing frames rise. Even in-betweens.
-    bounce = [0, -1, -3, -2, 0, -1, -3, -2][f]
+    # Squash on contact (body lower), slight rise only on mid single-support.
+    bounce = [1, 0, -1, 0, 1, 0, -1, 0][f]
     stretch = [2, 1, 0, 1, 2, 1, 0, 1][f]
-    # Tail lags the body bob by ~1 frame.
-    raise_ = [0, 1, 2, 4, 1, 2, 3, 5][f]
-    ground = 61
-    bx, by = 32, 45 + bounce
+    raise_ = [0, 1, 2, 3, 1, 2, 3, 4][f]
+    sole = SOLE_Y
+    # Lean the mass over the standing near-leg: forward when FL is planted (1-3).
+    x_lean = [0, 1, 2, 1, 0, 0, -1, 0][f]
+    bx, by = 32 + x_lean, 46 + bounce
     _tail_side(c, bx - 15, by + 3, raise_=raise_, extend=0)
 
-    fl_hip = (bx + 10 + stretch, by + 5)
-    fr_hip = (bx + 6 + stretch, by + 4)
-    hl_hip = (bx - 8 - stretch, by + 6)
-    hr_hip = (bx - 12 - stretch, by + 5)
+    fl_hip = (bx + 10 + stretch, by + 6)
+    fr_hip = (bx + 6 + stretch, by + 5)
+    hl_hip = (bx - 8 - stretch, by + 7)
+    hr_hip = (bx - 12 - stretch, by + 6)
 
-    # Diagonal gait: FL with HR, FR with HL. phase 0 = FL/HR forward contact.
     ph = f / 8.0
-    fl_dx, fl_y, fl_up = _gait_stride(ph, 11.0, 5.0, ground)
-    fr_dx, fr_y, fr_up = _gait_stride(ph + 0.5, 11.0, 5.0, ground)
-    hl_dx, hl_y, hl_up = _gait_stride(ph + 0.5, 11.0, 5.0, ground)
-    hr_dx, hr_y, hr_up = _gait_stride(ph, 11.0, 5.0, ground)
+    fl_dx, fl_y, fl_up = _gait_stride(ph, 10.0, 5.0, sole)
+    fr_dx, fr_y, fr_up = _gait_stride(ph + 0.5, 10.0, 5.0, sole)
+    hl_dx, hl_y, hl_up = _gait_stride(ph + 0.5, 10.0, 5.0, sole)
+    hr_dx, hr_y, hr_up = _gait_stride(ph, 10.0, 5.0, sole)
     fl = (int(round(fl_hip[0] + fl_dx)), int(round(fl_y)), fl_up)
     fr = (int(round(fr_hip[0] + fr_dx)), int(round(fr_y)), fr_up)
     hl = (int(round(hl_hip[0] + hl_dx)), int(round(hl_y)), hl_up)
@@ -650,9 +706,12 @@ def draw_cat_walk_side(frame: int) -> C:
     _leg_side(c, fl_hip[0], fl_hip[1], fl[0], fl[1], near=True, lifted=fl[2])
 
     hx = bx + 13 + stretch
-    hy = by - 16 + (0 if bounce >= -1 else -1)
-    _head_side(c, hx, hy, perk=1 if bounce <= -2 else 0)
+    hy = by - 16 + (0 if bounce >= 0 else -1)
+    _head_side(c, hx, hy, perk=1 if bounce < 0 else 0)
     c.outline(col("ink"))
+    for ft in (fl, fr, hl, hr):
+        if not ft[2]:
+            _foot_shadow(c, ft[0], sole, 4.2)
     return c
 
 
@@ -698,10 +757,10 @@ def _tail_back(c: C, cx: int, y_base: int, swing: int = 0, raise_: int = 0) -> N
     mag = abs(swing)
     segs = [
         (cx, y_base),
-        (cx + s * (3 + mag // 2), y_base + 2),
-        (cx + s * (7 + mag), y_base - 1 - raise_),
-        (cx + s * (8 + mag), y_base - 6 - raise_),
-        (cx + s * (5 + mag), y_base - 10 - raise_),
+        (cx + s * (3 + mag // 2), y_base - 1),
+        (cx + s * (7 + mag), y_base - 3 - raise_),
+        (cx + s * (8 + mag), y_base - 7 - raise_),
+        (cx + s * (5 + mag), y_base - 11 - raise_),
     ]
     prev = segs[0]
     r = 3.4
@@ -716,98 +775,105 @@ def _tail_back(c: C, cx: int, y_base: int, swing: int = 0, raise_: int = 0) -> N
 
 
 def draw_cat_walk_down(frame: int) -> C:
-    """Front walk, 8-frame bounce with a clearer left/right stride."""
+    """Front walk: planted socks sit on a shared sole line; pads only when lifted."""
     c = C(64, 64)
     f = frame % 8
-    cx, ground = 32, 61
-    bounce = [0, -1, -2, -1, 0, -1, -2, -1][f]
-    sway = [0, 1, 2, 1, 0, -1, -2, -1][f]
-    body_cy = 49 + bounce
-    head_cy = 24 + bounce + (0 if bounce >= -1 else -1)
-    # Tail lags and eases from right to left across the cycle.
+    cx, sole = 32, SOLE_Y
+    bounce = [1, 0, -1, 0, 1, 0, -1, 0][f]
+    # Lean over the supporting front paw (left on 1-3, right on 5-7).
+    sway = [0, -1, -2, -1, 0, 1, 2, 1][f]
+    body_cy = 50 + bounce
+    head_cy = 25 + bounce + (0 if bounce >= 0 else -1)
     tail_side = 1 if f < 4 else -1
     tail_raise = [0, 1, 3, 2, 0, 1, 3, 2][f]
     _tail_peek(c, cx + sway, body_cy, side=tail_side, raise_=tail_raise)
     c.ellipse(cx + sway, body_cy, 14, 10, col("fur"))
     c.ellipse(cx + sway - 3, body_cy - 3, 9, 7, col("fur_l"))
     c.ellipse(cx + sway, body_cy - 3, 7, 6, col("white"))
-    # Hind socks: opposite the same-side front paw.
-    hind_l_up = f >= 4
-    hind_r_up = f < 4
-    for sign, up in ((-1, hind_l_up), (1, hind_r_up)):
-        hx = cx + sway + sign * (11 if up else 13)
-        hy = body_cy + (8 if up else 10)
-        c.ellipse(hx, hy, 2.8, 2.2, col("fur_d") if not up else col("white"))
-        c.ellipse(hx, hy + 1, 2.2, 1.6, col("white"))
-        if up:
-            c.p(hx, hy + 1, col("bean"))
-    # Front paws: left stance on 0-3, right stance on 4-7, with in-betweens.
-    def front_paw(phase_t: float):
-        dx, yoff, lifted = _gait_stride(phase_t, 3.0, 6.0, 0)
-        return int(round(-11 + dx)), int(round(-7 - (6.0 - yoff) if lifted else -6)), lifted
-    # left uses phase f/8, right is opposite
-    for phase, x_sign in ((f / 8.0, -1), (f / 8.0 + 0.5, 1)):
-        tph = phase % 1.0
-        dx, y, lifted = _gait_stride(tph, 3.5, 6.0, ground - 6)
-        # mirror x around the body for the right paw
-        if x_sign > 0:
-            px = cx + sway + 6 + int(round(dx))
+    # Hind socks share a diagonal with the opposite front (HL+FR, HR+FL).
+    shadows = []
+    for sign, hind_phase in ((-1, f / 8.0 + 0.5), (1, f / 8.0)):
+        _dx, _y, hind_up = _gait_stride(hind_phase, 3.0, 5.0, sole)
+        hx = cx + sway + sign * (10 if hind_up else 12)
+        if hind_up:
+            c.ellipse(hx, body_cy + 6, 2.6, 2.0, col("fur_d"))
+            c.ellipse(hx, body_cy + 7, 2.2, 1.6, col("white"))
+            c.p(hx, body_cy + 8, col("bean"))
         else:
-            px = cx + sway - 11 + int(round(dx))
-        py = int(round(y)) + (bounce if not lifted else bounce - 1)
+            c.ellipse(hx, sole - 3, 2.6, 2.0, col("fur_d"))
+            c.ellipse(hx, sole - 1, 3.0, 1.7, col("white"))
+            shadows.append(hx)
+    # Front paws — planted on SOLE_Y, never moved by bounce.
+    for phase, sign in ((f / 8.0, -1), (f / 8.0 + 0.5, 1)):
+        dx, y, lifted = _gait_stride(phase, 3.5, 6.0, sole)
+        px = cx + sway + sign * 9 + int(round(dx))
         if lifted:
-            py = min(py, ground - 11)
-        _paw_beans(c, px, py)
+            _paw_lifted_front(c, px, int(round(y)) - 6)
+        else:
+            _paw_planted_front(c, px, sole, col("fur"))
+            shadows.append(px)
     c.ellipse(cx + sway, head_cy, 19, 16, col("fur"))
     c.ellipse(cx + sway - 4, head_cy - 4, 12, 10, col("fur_l"))
-    _ears(c, cx + sway, head_cy, perk=1 if bounce <= -2 else 0)
+    _ears(c, cx + sway, head_cy, perk=1 if bounce < 0 else 0)
     c.ellipse(cx + sway, head_cy - 6, 14, 8, col("fur"))
     c.ellipse(cx + sway - 3, head_cy - 8, 8, 5, col("fur_l"))
     _face(c, cx + sway, head_cy, mouth="w", look=sway)
     c.outline(col("ink"))
+    for x in shadows:
+        _foot_shadow(c, x, sole, 4.0)
     return c
 
 
 def draw_cat_walk_up(frame: int) -> C:
-    """Back walk, 8-frame stride. Ears + back + tail, no face."""
+    """Back walk: hind (near) paws plant on a shared sole; pads only when lifted."""
     c = C(64, 64)
     f = frame % 8
-    cx, ground = 32, 61
-    bounce = [0, -1, -2, -1, 0, -1, -2, -1][f]
+    cx, sole = 32, SOLE_Y
+    bounce = [1, 0, -1, 0, 1, 0, -1, 0][f]
     sway = [0, -1, -2, -1, 0, 1, 2, 1][f]
-    body_cy = 48 + bounce
-    head_cy = 24 + bounce + (0 if bounce >= -1 else -1)
-    # Far (front) paws under the chest, opposite the hind pair.
+    body_cy = 49 + bounce
+    head_cy = 25 + bounce + (0 if bounce >= 0 else -1)
+    shadows = []
+    # Far (front) paws under the chest — still reach the sole when planted.
     for sign, phase in ((-1, f / 8.0 + 0.5), (1, f / 8.0)):
-        dx, y, lifted = _gait_stride(phase, 3.0, 3.0, 0)
-        x = cx + sway + sign * 8 + int(round(dx * 0.4))
-        yy = body_cy + 9 + (0 if not lifted else -2)
-        c.ellipse(x, yy, 2.6, 2.2, col("fur_d"))
-        c.ellipse(x, yy + 2, 2.0, 1.6, col("white"))
+        dx, y, lifted = _gait_stride(phase, 3.0, 4.0, sole)
+        x = cx + sway + sign * 7 + int(round(dx * 0.4))
+        if lifted:
+            c.ellipse(x, body_cy + 7, 2.4, 2.0, col("fur_d"))
+            c.ellipse(x, body_cy + 8, 2.0, 1.6, col("white"))
+            c.p(x, body_cy + 9, col("bean"))
+        else:
+            c.ellipse(x, sole - 3, 2.5, 2.0, col("fur_d"))
+            c.ellipse(x, sole - 1, 2.8, 1.6, col("white"))
+            shadows.append(x)
     c.ellipse(cx + sway, body_cy, 14, 10, col("fur"))
     c.ellipse(cx + sway, body_cy - 3, 9, 7, col("fur_l"))
     c.ellipse(cx + sway, body_cy - 1, 2.0, 6, col("stripe"))
     c.ellipse(cx + sway, body_cy + 5, 1.6, 3.4, col("stripe"))
-    # Hind paws closer to camera
+    # Hind paws (closer to camera) — these are the weight-bearing pair.
     for sign, phase in ((-1, f / 8.0), (1, f / 8.0 + 0.5)):
-        dx, y, lifted = _gait_stride(phase, 4.0, 5.0, ground - 6)
+        dx, y, lifted = _gait_stride(phase, 4.0, 5.5, sole)
         x = cx + sway + sign * 11 + int(round(dx * 0.5))
-        yy = int(round(y)) + (bounce if not lifted else bounce - 1)
         if lifted:
-            c.ellipse(x, yy + 2, 3.4, 3.0, col("fur_d"))
-            c.ellipse(x, yy + 4, 3.0, 2.4, col("white"))
-            c.p(x, yy + 5, col("bean"))
-            c.p(x - 2, yy + 3, col("bean"))
-            c.p(x + 2, yy + 3, col("bean"))
+            c.ellipse(x, int(round(y)) - 3, 3.2, 2.8, col("fur_d"))
+            c.ellipse(x, int(round(y)) - 1, 3.0, 2.4, col("white"))
+            c.p(x, int(round(y)), col("bean"))
+            c.p(x - 2, int(round(y)) - 2, col("bean"))
+            c.p(x + 2, int(round(y)) - 2, col("bean"))
         else:
-            c.ellipse(x, yy + 3, 3.4, 2.6, col("fur_d"))
-            c.ellipse(x, yy + 5, 3.0, 2.2, col("white"))
-            c.p(x, yy + 6, col("bean"))
-    _head_back(c, cx + sway, head_cy, perk=1 if bounce <= -2 else 0)
-    # Tail lags the sway so it follows through.
+            # Flat planted hind sock on the sole, no pads.
+            c.ellipse(x, sole - 4, 3.0, 2.4, col("fur_d"))
+            c.ellipse(x, sole - 1, 3.6, 1.8, col("white"))
+            c.p(x - 2, sole - 2, col("white_d"))
+            c.p(x + 2, sole - 2, col("white_d"))
+            shadows.append(x)
+    _head_back(c, cx + sway, head_cy, perk=1 if bounce < 0 else 0)
     lag = [0, -1, -2, -1, 0, 1, 3, 2][f]
-    _tail_back(c, cx + sway, body_cy + 8, swing=lag, raise_=[0, 1, 3, 2, 0, 1, 3, 2][f])
+    # Root the tail on the rump, never let the downward curl pierce the sole.
+    _tail_back(c, cx + sway, body_cy + 3, swing=lag, raise_=[1, 2, 3, 2, 1, 2, 3, 2][f])
     c.outline(col("ink"))
+    for x in shadows:
+        _foot_shadow(c, x, sole, 4.2)
     return c
 
 
@@ -821,13 +887,17 @@ def draw_cat_sit_up(bob: int = 0) -> C:
     c.ellipse(cx, body_cy, 16, 11, col("fur"))
     c.ellipse(cx, body_cy - 3, 10, 8, col("fur_l"))
     c.ellipse(cx, body_cy, 2.0, 6, col("stripe"))
-    c.ellipse(cx - 13, ground - 4, 4.0, 2.6, col("fur_d"))
-    c.ellipse(cx + 13, ground - 4, 4.0, 2.6, col("fur_d"))
+    c.ellipse(cx - 13, SOLE_Y - 3, 3.6, 2.2, col("fur_d"))
+    c.ellipse(cx - 13, SOLE_Y - 1, 3.4, 1.7, col("white"))
+    c.ellipse(cx + 13, SOLE_Y - 3, 3.6, 2.2, col("fur_d"))
+    c.ellipse(cx + 13, SOLE_Y - 1, 3.4, 1.7, col("white"))
     # no face, just the back of the head
     _head_back(c, cx, head_cy, perk=0)
     # tail curled to the right, resting
     _tail(c, 46, 50, curl=1)
     c.outline(col("ink"))
+    _foot_shadow(c, cx - 13, SOLE_Y, 4.5)
+    _foot_shadow(c, cx + 13, SOLE_Y, 4.5)
     return c
 
 
