@@ -78,15 +78,25 @@ func _head_canvas() -> Vector2:
 		p = _cat.global_position + Vector2(0, -42)
 	return _cat.get_canvas_transform() * p
 
+func _world_scale() -> float:
+	if _cat == null:
+		return 2.25
+	return maxf(_cat.get_canvas_transform().x.length(), 0.5)
+
 func _place(t: float) -> void:
 	var head := _head_canvas()
+	var s := _world_scale()
+	# Hand ~20 world px wide whatever the camera zoom, so it reads as a hand on the head.
+	var k := clampf(24.0 * s / 48.0, 0.6, 3.0)
 	# Two slow strokes: forehead (above head) down toward the nape.
 	var cycle := fmod(t * 2.0, 1.0)
 	var stroke := 1.0 - absf(cycle * 2.0 - 1.0)
-	var start := head + Vector2(8, -28)
-	var finish := head + Vector2(-2, 6)
+	var start := head + Vector2(3.0, -14.0) * s
+	var finish := head + Vector2(-1.0, -6.0) * s
 	var pos := start.lerp(finish, stroke)
 	if _hand:
+		_hand.pivot_offset = Vector2(16, 28)
+		_hand.scale = Vector2(k, k)
 		_hand.position = pos - Vector2(16, 28)
 		_hand.rotation_degrees = lerp(-18.0, 12.0, stroke)
 		_hand.modulate.a = 1.0 if t < 0.9 else (1.0 - (t - 0.9) / 0.1)
@@ -98,7 +108,8 @@ func _place(t: float) -> void:
 			h.visible = false
 			continue
 		h.visible = true
-		h.position = head + Vector2(-8 + i * 10.0, -18.0 - ht * 28.0)
+		h.scale = Vector2(k, k) * 0.8
+		h.position = head + Vector2(-9.0 + i * 8.0, -16.0 - ht * 12.0) * s
 		h.modulate.a = 1.0 - ht
 
 func _draw() -> void:

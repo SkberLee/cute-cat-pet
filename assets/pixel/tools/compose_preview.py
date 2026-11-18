@@ -57,6 +57,61 @@ def compose_strip(paths, scale, gap=8, pad=8, bg=BG):
     return c
 
 
+# v0.3 cat clips: (file prefix, label)
+CAT_ANIMS = [
+    ("walk_side", "侧面走 walk_side ×8（向左时水平翻转）"),
+    ("walk_down", "向屏幕走 walk_down ×8"),
+    ("walk_up", "背对走 walk_up ×8"),
+    ("idle_down", "正面站立 idle_down ×16（呼吸 + 眨眼 + 尾巴摆）"),
+    ("idle_side", "侧面站立 idle_side ×16"),
+    ("idle_up", "背面站立 idle_up ×16（呼吸 + 耳朵抖 + 尾巴摆）"),
+    ("sit", "坐 sit ×4"), ("sit_blink", "坐·眨眼 sit_blink ×3"),
+    ("sit_side", "侧坐 sit_side ×4"), ("sit_up", "背坐 sit_up ×4"),
+    ("eat_side", "吃 eat_side ×6（低头进碗 + 咀嚼）"),
+    ("happy", "开心 happy ×4"), ("call", "被摸 call ×4（闭眼蹭手）"),
+    ("play_side", "扑 play_side ×8（压低-扭屁股-扑-落地-拍）"),
+    ("play_down", "拍 play_down ×6（左右爪轮流）"),
+    ("sleep", "睡 sleep ×4（呼吸）"),
+]
+
+
+def cat_frames(prefix):
+    out = []
+    i = 0
+    while (PIX / f"cat/{prefix}_{i}.png").exists():
+        out.append(f"cat/{prefix}_{i}.png")
+        i += 1
+    return out
+
+
+def anim_sheet(scale=4, cols=8):
+    """Every cat animation, every frame, nearest-neighbour ×scale, labelled."""
+    cell = 64 * scale
+    rows = []
+    for prefix, label in CAT_ANIMS:
+        fr = cat_frames(prefix)
+        for k in range(0, len(fr), cols):
+            rows.append((label if k == 0 else "", fr[k:k + cols]))
+    W = 40 + cols * (cell + 8)
+    H = 80 + sum((30 if lab else 0) + cell + 10 for lab, _ in rows)
+    c = new_canvas(W, H)
+    d = ImageDraw.Draw(c)
+    text(d, (20, 16), "治愈猫 v0.3 · 全部猫咪动画（64×64 帧，×%d 最近邻）" % scale, 30)
+    y = 70
+    for lab, fr in rows:
+        if lab:
+            text(d, (20, y), lab, 20, MUTED)
+            y += 30
+        x = 20
+        for f in fr:
+            d.rectangle((x, y, x + cell - 1, y + cell - 1), fill=PANEL)
+            im = nn(load(f), scale)
+            c.paste(im, (x, y), im)
+            x += cell + 8
+        y += cell + 10
+    return c.crop((0, 0, W, y + 10))
+
+
 def room_mockup(scale=5) -> Image.Image:
     """Assemble tiles + furniture + cat into a cozy room scene."""
     W, H = 208, 160
@@ -68,7 +123,7 @@ def room_mockup(scale=5) -> Image.Image:
     lamp = load("room/lamp.png")
     box = load("room/box.png")
     ott = load("room/ottoman.png")
-    cat = load("cat/sit.png")
+    cat = load("cat/sit_0.png")
     fish = load("food/fish.png")
     bubble = load("fx/bubble_9slice.png")
     heart = load("fx/heart.png")
@@ -104,7 +159,7 @@ def room_mockup(scale=5) -> Image.Image:
 def preview_sheet():
     W = 1600
     # we'll grow height as we go; start large and crop
-    c = new_canvas(W, 4000)
+    c = new_canvas(W, 8000)
     d = ImageDraw.Draw(c)
     y = 24
     text(d, (40, y), "治愈猫 · 像素资源预览  （Stardew 风味的原创像素，非描摹）", 28)
@@ -119,34 +174,24 @@ def preview_sheet():
     c.paste(pal, (40, y), pal)
     y += pal.height + 28
 
-    # cat
-    text(d, (40, y), "猫咪  sit / blink / side / sit_up / sleep / happy / call", 20)
+    # cat (v0.3 redraw: every clip, every frame)
+    text(d, (40, y), "猫咪 v0.3 重绘：四向走 / 三向站立 / 坐 / 吃 / 开心 / 被摸 / 玩 / 睡（全部帧，×2）", 20)
     y += 28
-    row = compose_strip(
-        ["cat/sit.png", "cat/sit_blink.png", "cat/sit_side.png", "cat/sit_up.png", "cat/sleep.png", "cat/happy.png", "cat/call.png"],
-        3, gap=10, pad=6,
-    )
-    c.paste(row, (40, y), row)
-    y += row.height + 16
-    text(d, (40, y), "走路 四向 walk_down / walk_up / walk_side ×8（侧向左右共用，游戏里水平翻转）", 20)
-    y += 26
-    for label, prefix in (("向屏幕 walk_down", "walk_down"), ("背对 walk_up", "walk_up"), ("侧面 walk_side", "walk_side")):
+    for prefix, label in CAT_ANIMS:
         text(d, (48, y), label, 14, MUTED)
         y += 20
-        walk = compose_strip([f"cat/{prefix}_{i}.png" for i in range(8)], 2, gap=6, pad=4)
-        c.paste(walk, (40, y), walk)
-        y += walk.height + 10
-    text(d, (40, y), "吃 eat ×4    跳/扑 jump ×4", 20)
-    y += 26
-    ej = compose_strip([f"cat/eat_{i}.png" for i in range(4)] + [f"cat/jump_{i}.png" for i in range(4)], 3, gap=8, pad=6)
-    c.paste(ej, (40, y), ej)
-    y += ej.height + 28
+        fr = cat_frames(prefix)
+        strip = compose_strip(fr, 2 if len(fr) <= 11 else 1, gap=4, pad=4)
+        c.paste(strip, (40, y), strip)
+        y += strip.height + 6
+    y += 22
 
     # food toys hand
     text(d, (40, y), "食物  小鱼干 / 猫粮碗（满、空） / 罐头 / 牛奶（满、空）", 20)
     y += 26
     food = compose_strip(
-        ["food/fish.png", "food/kibble_bowl.png", "food/kibble_bowl_empty.png", "food/can.png", "food/milk.png", "food/milk_empty.png"],
+        ["food/fish.png", "food/kibble_bowl.png", "food/kibble_bowl_empty.png", "food/can.png", "food/milk.png", "food/milk_empty.png",
+         "food/dish_fish.png", "food/dish_kibble.png", "food/dish_can.png", "food/dish_milk.png"],
         4, gap=12, pad=6,
     )
     c.paste(food, (40, y), food)
@@ -172,6 +217,11 @@ def preview_sheet():
     )
     c.paste(room, (40, y), room)
     y += room.height + 16
+    text(d, (40, y), "墙面装饰 v0.3  窗（含窗帘）/ 书架 / 挂画 / 钟 / 龟背竹", 20)
+    y += 26
+    deco = compose_strip(["room/window.png", "room/shelf.png", "room/picture.png", "room/clock.png", "room/plant.png"], 3, gap=12, pad=6)
+    c.paste(deco, (40, y), deco)
+    y += deco.height + 16
     text(d, (40, y), "UI  心情面板 / 按钮 / 选择面板 / 应用图标与前景", 20)
     y += 26
     ui = compose_strip(
@@ -191,7 +241,7 @@ def preview_sheet():
         pass
     c.paste(mock, (40, y), mock)
     y += mock.height + 32
-    text(d, (40, y), "导出 PNG 时请只导出 pixel 图层（隐藏「原图」参考层）。v0.2.7 起这些素材已用于 2D 主场景；v0.2.8 起猫咪走路为四向（前 / 后 / 侧）。", 15, MUTED)
+    text(d, (40, y), "导出 PNG 时请只导出 pixel 图层（隐藏「原图」参考层）。v0.3.0 猫咪整套重绘（cat_art.py），墙面装饰/食盆/HUD 框见 room_art.py。", 15, MUTED)
     y += 36
 
     out = c.crop((0, 0, W, y + 16))
@@ -205,7 +255,7 @@ def showcases():
     SHOT.mkdir(exist_ok=True)
     # cat sit 6x
     bg = new_canvas(64 * 6 + 80, 64 * 6 + 80)
-    sit = nn(load("cat/sit.png"), 6)
+    sit = nn(load("cat/idle_down_0.png"), 6)
     bg.paste(sit, (40, 40), sit)
     p = SHOT / "pixel_preview_cat_sit.png"
     bg.convert("RGB").save(p)
@@ -215,7 +265,7 @@ def showcases():
     rows = []
     for prefix in ("walk_down", "walk_up", "walk_side"):
         rows.append(compose_strip([f"cat/{prefix}_{i}.png" for i in range(8)], 4, gap=8, pad=12))
-    idles = compose_strip(["cat/idle_down_0.png", "cat/idle_down_1.png", "cat/idle_up_0.png", "cat/idle_up_1.png", "cat/idle_side_0.png", "cat/idle_side_1.png"], 4, gap=12, pad=16)
+    idles = compose_strip(["cat/idle_down_0.png", "cat/idle_down_13.png", "cat/idle_up_0.png", "cat/idle_up_13.png", "cat/idle_side_0.png", "cat/idle_side_13.png"], 4, gap=12, pad=16)
     rows.append(idles)
     w = max(r.width for r in rows) + 16
     h = sum(r.height for r in rows) + 40
@@ -264,3 +314,6 @@ def showcases():
 if __name__ == "__main__":
     preview_sheet()
     showcases()
+    a = anim_sheet(4)
+    a.convert("RGB").save(SHOT / "v034_anim_sheet.png", optimize=True)
+    print("wrote", SHOT / "v034_anim_sheet.png", a.size)

@@ -320,10 +320,18 @@ const TOY_TEX := {
 	"mouse": "res://assets/pixel/toys/mouse.png",
 }
 
+## Low dishes for the floor (the tall icons stay for the picker UI).
+const DISH_TEX := {
+	"fish": "res://assets/pixel/food/dish_fish.png",
+	"kibble": "res://assets/pixel/food/dish_kibble.png",
+	"can": "res://assets/pixel/food/dish_can.png",
+	"milk": "res://assets/pixel/food/dish_milk.png",
+}
+
 static func make_food_2d(id: String) -> Node2D:
 	var root := Node2D.new()
 	root.name = "Food2D_%s" % id
-	var spr := PixelUtil.sprite(FOOD_TEX.get(id, FOOD_TEX["fish"]))
+	var spr := PixelUtil.sprite(DISH_TEX.get(id, DISH_TEX["fish"]))
 	spr.name = "Sprite"
 	# sit on the floor; bowl/can sprites are ~32px, origin at feet
 	spr.offset = Vector2(0, -12)

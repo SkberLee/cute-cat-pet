@@ -39,6 +39,12 @@ var _ui_scale := 1.0
 var food_picker: PickPanel
 var toy_picker: PickPanel
 var pet_hand: PetHand
+var _toast_panel: PanelContainer
+var _toast_label: Label
+var _toast_tween: Tween
+## World rows the portrait camera keeps between the HUD card and the buttons.
+const WORLD_TOP := -6.0
+const WORLD_BOTTOM := 212.0
 
 func _ready() -> void:
 	_style_ui()
@@ -62,6 +68,7 @@ func _ready() -> void:
 		if cat.has_signal("save_requested"):
 			cat.save_requested.connect(_save_game)
 	_build_pickers()
+	_build_toast()
 	if stats:
 		stats.stats_changed.connect(_refresh)
 		if stats.has_signal("milestone_unlocked"):
@@ -142,19 +149,39 @@ func _fit_camera_metrics() -> void:
 	var vis := get_viewport().get_visible_rect().size
 	if vis.x < 1.0 or vis.y < 1.0:
 		return
-	# Fit the whole room, then nudge downward a little so HUD doesn't cover the floor.
-	var z := minf(vis.x / ROOM_SIZE.x, vis.y / ROOM_SIZE.y)
-	_cam_fit_zoom = Vector2(z, z)
-	var visible_h := vis.y / z
-	var extra := visible_h - ROOM_SIZE.y
-	var y := ROOM_SIZE.y * 0.5
-	if _portrait and extra > 0.0:
-		# Keep the room optically between the HUD and the buttons.
-		y = ROOM_SIZE.y * 0.5 + minf(extra * 0.06, 12.0)
-	elif not _portrait:
-		# Nudge up so the bottom action row covers less of the floor.
-		y = ROOM_SIZE.y * 0.5 - 12.0
-	_cam_fit_pos = Vector2(ROOM_SIZE.x * 0.5, y)
+	if _portrait:
+		# Fill the band between the stats card and the buttons with the room
+		# (wall decor + floor) instead of fitting the width and leaving empty wall.
+		var top_ui := 0.0
+		var bottom_ui := vis.y
+		if stats_card and stats_card.size.y > 1.0:
+			top_ui = stats_card.get_global_rect().end.y + 8.0
+		else:
+			top_ui = 190.0
+		if buttons and buttons.size.y > 1.0:
+			bottom_ui = buttons.get_global_rect().position.y - 8.0
+		else:
+			bottom_ui = vis.y - 250.0
+		var band := maxf(bottom_ui - top_ui, vis.y * 0.4)
+		var z := band / (WORLD_BOTTOM - WORLD_TOP)
+		z = maxf(z, vis.x / ROOM_SIZE.x)
+		_cam_fit_zoom = Vector2(z, z)
+		var y := WORLD_TOP + (vis.y * 0.5 - top_ui) / z
+		var x := ROOM_SIZE.x * 0.5
+		if cat:
+			x = _clamp_cam_x(cat.global_position.x, z)
+		_cam_fit_pos = Vector2(x, y)
+		return
+	var zl := minf(vis.x / ROOM_SIZE.x, vis.y / ROOM_SIZE.y)
+	_cam_fit_zoom = Vector2(zl, zl)
+	_cam_fit_pos = Vector2(ROOM_SIZE.x * 0.5, ROOM_SIZE.y * 0.5 - 12.0)
+
+func _clamp_cam_x(x: float, z: float) -> float:
+	var vis := get_viewport().get_visible_rect().size
+	var half := vis.x / maxf(z, 0.01) * 0.5
+	if half * 2.0 >= ROOM_SIZE.x:
+		return ROOM_SIZE.x * 0.5
+	return clampf(x, half, ROOM_SIZE.x - half)
 
 func _snap_camera() -> void:
 	if camera == null:
@@ -168,8 +195,12 @@ func _snap_camera() -> void:
 func _process(delta: float) -> void:
 	if camera == null or cat == null or _zoomed or not _cam_follow:
 		return
-	# Gentle pull toward the roaming cat, but stay mostly room-framed.
-	var target := _cam_fit_pos.lerp(cat.global_position + Vector2(0, -20), 0.22)
+	# Portrait: follow the cat sideways inside the room; landscape: stay room-framed.
+	var target := _cam_fit_pos
+	if _portrait:
+		target = Vector2(_clamp_cam_x(cat.global_position.x, camera.zoom.x), _cam_fit_pos.y)
+	else:
+		target = _cam_fit_pos.lerp(cat.global_position + Vector2(0, -20), 0.22)
 	camera.position = camera.position.lerp(target, clampf(CAM_FOLLOW_SPEED * delta, 0.0, 1.0))
 
 func _enter_zoom() -> void:
@@ -184,7 +215,7 @@ func _enter_zoom() -> void:
 		btn_zoom_back.visible = true
 	_play_ui()
 	var focus: Vector2 = cat.get_focus_point() if cat.has_method("get_focus_point") else cat.global_position + Vector2(0, -36)
-	var z := _cam_fit_zoom * (2.15 if _portrait else 1.9)
+	var z := _cam_fit_zoom * (1.6 if _portrait else 1.9)
 	if _cam_tween and _cam_tween.is_valid():
 		_cam_tween.kill()
 	_cam_tween = create_tween()
@@ -475,6 +506,12 @@ func _apply_layout() -> void:
 	_layout_pickers(ins)
 	if not _zoomed:
 		_restore_camera(false)
+		call_deferred("_refit_after_layout")
+
+func _refit_after_layout() -> void:
+	await get_tree().process_frame
+	if not _zoomed:
+		_restore_camera(false)
 
 func _set_buttons_enabled(enabled: bool) -> void:
 	btn_pet.disabled = not enabled
@@ -538,6 +575,51 @@ func _on_pet_stroke(duration: float = 0.9) -> void:
 	if pet_hand:
 		pet_hand.play(duration)
 
+func _build_toast() -> void:
+	_toast_panel = PanelContainer.new()
+	_toast_panel.name = "Toast"
+	_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var sb := _nine_tex("res://assets/pixel/fx/bubble_9slice.png", 10, 10, 10, 10)
+	sb.content_margin_left = 22
+	sb.content_margin_right = 22
+	sb.content_margin_top = 10
+	sb.content_margin_bottom = 10
+	_toast_panel.add_theme_stylebox_override("panel", sb)
+	_toast_label = Label.new()
+	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast_label.add_theme_color_override("font_color", Color(0.35, 0.25, 0.28))
+	var f := PixelUtil.font()
+	if f:
+		_toast_label.add_theme_font_override("font", f)
+	_toast_panel.add_child(_toast_label)
+	_toast_panel.visible = false
+	$Root.add_child(_toast_panel)
+
+func _toast(text: String) -> void:
+	if _toast_panel == null:
+		_bubble_say(text)
+		return
+	_toast_label.text = text
+	_toast_label.add_theme_font_size_override("font_size", 26 if _portrait else 22)
+	_toast_panel.reset_size()
+	var vis := get_viewport().get_visible_rect().size
+	var sz := _toast_panel.get_combined_minimum_size()
+	var y := stats_card.get_global_rect().end.y + 14.0 if stats_card else 200.0
+	if not _portrait:
+		y = 24.0
+	_toast_panel.size = sz
+	_toast_panel.position = Vector2((vis.x - sz.x) * 0.5, y)
+	_toast_panel.visible = true
+	_toast_panel.modulate.a = 0.0
+	if _toast_tween and _toast_tween.is_valid():
+		_toast_tween.kill()
+	_toast_tween = create_tween()
+	_toast_tween.tween_property(_toast_panel, "modulate:a", 1.0, 0.15)
+	_toast_tween.tween_interval(1.4)
+	_toast_tween.tween_property(_toast_panel, "modulate:a", 0.0, 0.25)
+	_toast_tween.tween_callback(func (): _toast_panel.visible = false)
+
 func _build_pickers() -> void:
 	var root := $Root
 	var names: Array = []
@@ -592,7 +674,8 @@ func _on_theme() -> void:
 	var id := room_cosmetics.cycle_next(stats.bond)
 	_play_ui()
 	_update_theme_button()
-	_bubble_say("房间换成「%s」啦" % room_cosmetics.theme_display_name(id))
+	# A short HUD toast — not a cat speech bubble that follows the cat around.
+	_toast("房间换成「%s」啦" % room_cosmetics.theme_display_name(id))
 	_save_game()
 
 func _on_milestone_ui(_threshold: int, _title: String) -> void:

@@ -1806,50 +1806,8 @@ def main():
     ref_icon = ref_crop("app_icon.png", None, 64, 64, alpha=0.28)
 
     # --- cat ---
-    pack_sprite(PIX / "cat/sit.aseprite", 64, 64, draw_cat_sit(), ref_sit)
-    pack_sprite(PIX / "cat/sit_blink.aseprite", 64, 64, draw_cat_sit(blink=True), ref_sit)
-    pack_sprite(PIX / "cat/sit_side.aseprite", 64, 64, draw_cat_sit_side(), ref_sit)
-    pack_sprite(
-        PIX / "cat/walk.aseprite",
-        64,
-        64,
-        [draw_cat_walk_side(i) for i in range(8)],
-        ref_sit,
-        duration=110,
-    )
-    pack_sprite(
-        PIX / "cat/walk_side.aseprite",
-        64,
-        64,
-        [draw_cat_walk_side(i) for i in range(8)],
-        ref_sit,
-        duration=110,
-    )
-    pack_sprite(
-        PIX / "cat/walk_down.aseprite",
-        64,
-        64,
-        [draw_cat_walk_down(i) for i in range(8)],
-        ref_sit,
-        duration=110,
-    )
-    pack_sprite(
-        PIX / "cat/walk_up.aseprite",
-        64,
-        64,
-        [draw_cat_walk_up(i) for i in range(8)],
-        ref_sit,
-        duration=110,
-    )
-    pack_sprite(PIX / "cat/sit_up.aseprite", 64, 64, draw_cat_sit_up(), ref_sit)
-    pack_sprite(PIX / "cat/idle_up.aseprite", 64, 64, [draw_cat_idle_up(0), draw_cat_idle_up(1)], ref_sit, duration=500)
-    pack_sprite(PIX / "cat/idle_down.aseprite", 64, 64, [draw_cat_idle_down(0), draw_cat_idle_down(1)], ref_sit, duration=500)
-    pack_sprite(PIX / "cat/idle_side.aseprite", 64, 64, [draw_cat_idle_side(0), draw_cat_idle_side(1)], ref_sit, duration=500)
-    pack_sprite(PIX / "cat/eat.aseprite", 64, 64, [draw_cat_eat(i) for i in range(4)], ref_eat, duration=130)
-    pack_sprite(PIX / "cat/jump.aseprite", 64, 64, [draw_cat_jump(i) for i in range(4)], ref_sit, duration=100)
-    pack_sprite(PIX / "cat/sleep.aseprite", 64, 64, draw_cat_sleep(), ref_sit)
-    pack_sprite(PIX / "cat/happy.aseprite", 64, 64, draw_cat_happy(), ref_sit)
-    pack_sprite(PIX / "cat/call.aseprite", 64, 64, draw_cat_call(), ref_paws)
+    # v0.3: the cat set (and room dressing / dishes / HUD frame) lives in cat_art.py + room_art.py
+    # and is packed by pack_v03.pack_all() at the end of main().
 
     # --- room ---
     pack_sprite(PIX / "room/floor_wood_32.aseprite", 32, 32, draw_floor_32(), ref_room)
@@ -1884,7 +1842,7 @@ def main():
     pack_sprite(PIX / "fx/bubble_tail.aseprite", 16, 16, draw_bubble_tail(), empty_ref(16, 16))
 
     # --- ui ---
-    pack_sprite(PIX / "ui/panel_mood.aseprite", 96, 48, draw_panel_mood(), ref_hud)
+    # ui/panel_mood is drawn by room_art (frame only, no baked bars) — packed in pack_v03.
     pack_sprite(PIX / "ui/button.aseprite", 48, 20, draw_button(False), empty_ref(48, 20))
     pack_sprite(PIX / "ui/button_pressed.aseprite", 48, 20, draw_button(True), empty_ref(48, 20))
     pack_sprite(PIX / "ui/picker_panel.aseprite", 128, 48, draw_picker(), empty_ref(128, 48))
@@ -1915,6 +1873,9 @@ def main():
     pal = draw_palette()
     pal.save(PIX / "palette.png")
     pack_sprite(PIX / "palette.aseprite", pal.w, pal.h, pal, empty_ref(pal.w, pal.h))
+
+    import pack_v03
+    pack_v03.pack_all(pack_sprite, ref_sit, finalize=True)
 
     print("sprites packed")
     return 0

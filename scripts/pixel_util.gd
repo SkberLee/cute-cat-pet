@@ -19,76 +19,50 @@ static func font() -> Font:
 		return f
 	return ThemeDB.fallback_font
 
+## v0.3 cat set: [png prefix, frame count, fps, loop]. Aliases keep the old clip names.
+const CAT_CLIPS := {
+	"walk_side": ["walk_side", 8, 10.0, true],
+	"walk_down": ["walk_down", 8, 10.0, true],
+	"walk_up": ["walk_up", 8, 10.0, true],
+	"run_side": ["walk_side", 8, 15.0, true],
+	"run_down": ["walk_down", 8, 15.0, true],
+	"run_up": ["walk_up", 8, 15.0, true],
+	"walk": ["walk_side", 8, 10.0, true],
+	"run": ["walk_side", 8, 15.0, true],
+	"idle_down": ["idle_down", 16, 6.0, true],
+	"idle_up": ["idle_up", 16, 6.0, true],
+	"idle_side": ["idle_side", 16, 6.0, true],
+	"sit": ["sit", 4, 3.0, true],
+	"idle": ["sit", 4, 3.0, true],
+	"sit_blink": ["sit_blink", 3, 10.0, false],
+	"sit_side": ["sit_side", 4, 3.0, true],
+	"sit_up": ["sit_up", 4, 3.0, true],
+	"eat_side": ["eat_side", 6, 7.0, false],
+	"eat": ["eat_side", 6, 7.0, false],
+	"happy": ["happy", 4, 6.0, true],
+	"idle_alt": ["happy", 4, 6.0, false],
+	"call": ["call", 4, 5.0, true],
+	"play_side": ["play_side", 8, 11.0, false],
+	"attack": ["play_side", 8, 11.0, false],
+	"play_down": ["play_down", 6, 10.0, false],
+	"jump": ["play_down", 6, 10.0, false],
+	"sleep": ["sleep", 4, 2.0, true],
+}
+## Chewing loop = eat_side frames 2..5 (head already down in the bowl).
+const CHEW_FRAMES := [2, 3, 4, 5]
+
 static func cat_frames() -> SpriteFrames:
 	var sf := SpriteFrames.new()
-	_add(sf, "sit", ["res://assets/pixel/cat/sit.png"], 1.0, true)
-	_add(sf, "idle", ["res://assets/pixel/cat/sit.png"], 1.0, true)
-	_add(sf, "idle_down", ["res://assets/pixel/cat/idle_down_0.png", "res://assets/pixel/cat/idle_down_1.png"], 2.0, true)
-	_add(sf, "sit_blink", ["res://assets/pixel/cat/sit_blink.png"], 6.0, false)
-	_add(sf, "call", ["res://assets/pixel/cat/call.png"], 4.0, false)
-	_add(sf, "happy", ["res://assets/pixel/cat/happy.png"], 4.0, true)
-	_add(sf, "idle_alt", ["res://assets/pixel/cat/happy.png"], 4.0, false)
-	_add(sf, "sleep", ["res://assets/pixel/cat/sleep.png"], 2.0, true)
-	_add(sf, "sit_side", ["res://assets/pixel/cat/sit_side.png"], 1.0, true)
-	_add(sf, "idle_side", ["res://assets/pixel/cat/idle_side_0.png", "res://assets/pixel/cat/idle_side_1.png"], 2.0, true)
-	_add(sf, "sit_up", ["res://assets/pixel/cat/sit_up.png"], 1.0, true)
-	_add(sf, "idle_up", ["res://assets/pixel/cat/idle_up_0.png", "res://assets/pixel/cat/idle_up_1.png"], 2.0, true)
-	var side := [
-		"res://assets/pixel/cat/walk_side_0.png",
-		"res://assets/pixel/cat/walk_side_1.png",
-		"res://assets/pixel/cat/walk_side_2.png",
-		"res://assets/pixel/cat/walk_side_3.png",
-		"res://assets/pixel/cat/walk_side_4.png",
-		"res://assets/pixel/cat/walk_side_5.png",
-		"res://assets/pixel/cat/walk_side_6.png",
-		"res://assets/pixel/cat/walk_side_7.png",
-	]
-	var down := [
-		"res://assets/pixel/cat/walk_down_0.png",
-		"res://assets/pixel/cat/walk_down_1.png",
-		"res://assets/pixel/cat/walk_down_2.png",
-		"res://assets/pixel/cat/walk_down_3.png",
-		"res://assets/pixel/cat/walk_down_4.png",
-		"res://assets/pixel/cat/walk_down_5.png",
-		"res://assets/pixel/cat/walk_down_6.png",
-		"res://assets/pixel/cat/walk_down_7.png",
-	]
-	var up := [
-		"res://assets/pixel/cat/walk_up_0.png",
-		"res://assets/pixel/cat/walk_up_1.png",
-		"res://assets/pixel/cat/walk_up_2.png",
-		"res://assets/pixel/cat/walk_up_3.png",
-		"res://assets/pixel/cat/walk_up_4.png",
-		"res://assets/pixel/cat/walk_up_5.png",
-		"res://assets/pixel/cat/walk_up_6.png",
-		"res://assets/pixel/cat/walk_up_7.png",
-	]
-	_add(sf, "walk", side, 10.0, true)
-	_add(sf, "walk_side", side, 10.0, true)
-	_add(sf, "walk_down", down, 10.0, true)
-	_add(sf, "walk_up", up, 10.0, true)
-	_add(sf, "run", side, 15.0, true)
-	_add(sf, "run_side", side, 15.0, true)
-	_add(sf, "run_down", down, 15.0, true)
-	_add(sf, "run_up", up, 15.0, true)
-	_add(sf, "eat", [
-		"res://assets/pixel/cat/eat_0.png",
-		"res://assets/pixel/cat/eat_1.png",
-		"res://assets/pixel/cat/eat_2.png",
-		"res://assets/pixel/cat/eat_3.png",
-	], 6.0, false)
-	_add(sf, "jump", [
-		"res://assets/pixel/cat/jump_0.png",
-		"res://assets/pixel/cat/jump_1.png",
-		"res://assets/pixel/cat/jump_2.png",
-		"res://assets/pixel/cat/jump_3.png",
-	], 8.0, false)
-	_add(sf, "attack", [
-		"res://assets/pixel/cat/jump_1.png",
-		"res://assets/pixel/cat/jump_2.png",
-		"res://assets/pixel/cat/jump_3.png",
-		"res://assets/pixel/cat/jump_0.png",
-	], 9.0, false)
+	for clip in CAT_CLIPS.keys():
+		var spec: Array = CAT_CLIPS[clip]
+		var paths: Array = []
+		for i in int(spec[1]):
+			paths.append("res://assets/pixel/cat/%s_%d.png" % [spec[0], i])
+		_add(sf, clip, paths, float(spec[2]), bool(spec[3]))
+	var chew: Array = []
+	for i in CHEW_FRAMES:
+		chew.append("res://assets/pixel/cat/eat_side_%d.png" % i)
+	_add(sf, "chew_side", chew, 7.0, true)
 	return sf
 
 static func _add(sf: SpriteFrames, name: String, paths: Array, fps: float, loop: bool) -> void:

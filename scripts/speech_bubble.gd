@@ -4,7 +4,7 @@ class_name SpeechBubble
 
 ## Canvas-space bubble that follows the cat's mouth in the 2D world.
 
-const HOLD_SEC := 2.75
+const HOLD_SEC := 2.2
 const FADE_IN := 0.18
 const FADE_OUT := 0.22
 
@@ -142,6 +142,20 @@ func _mouth_world() -> Vector2:
 		return _cat.global_position + Vector2(0.0, -26.0)
 	return Vector2.ZERO
 
+func _head_canvas_rect(tip: Vector2) -> Rect2:
+	if _cat and _cat.has_method("get_head_rect"):
+		var r: Rect2 = _cat.get_head_rect()
+		var a := _world_to_canvas(r.position)
+		var b := _world_to_canvas(r.end)
+		return Rect2(a, b - a)
+	return Rect2(tip - Vector2(60, 70), Vector2(120, 90))
+
+## Hide early (e.g. when the cat walks off and the line no longer belongs to it).
+func dismiss() -> void:
+	if _showing and _hold > 0.0:
+		_hold = -1.0
+		_fade_out()
+
 func _world_to_canvas(world: Vector2) -> Vector2:
 	if _cat and is_instance_valid(_cat):
 		return _cat.get_canvas_transform() * world
@@ -159,7 +173,7 @@ func _update_follow() -> void:
 	var font := label.get_theme_font("font")
 	var pad_x := 18.0
 	var pad_y := 12.0
-	var max_text_w := maxf(_max_w - pad_x * 2.0, 120.0)
+	var max_text_w := maxf(minf(_max_w, vp.x * 0.62) - pad_x * 2.0, 120.0)
 	var one_line := font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, _font_size)
 	var text_w := minf(one_line.x + 4.0, max_text_w)
 	var text_sz := font.get_multiline_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, text_w, _font_size)
@@ -170,24 +184,24 @@ func _update_follow() -> void:
 	panel.position = Vector2.ZERO
 	panel.size = Vector2(bw, bh)
 	size = Vector2(bw, bh)
-	# In 2D, mouth is above the feet (smaller y). Place bubble beside/above the mouth.
-	var head_r := 72.0
+	# Keep the whole bubble clear of the cat's head: beside it (right, else left),
+	# else above the ears. Always fully on screen.
 	var margin := 12.0
+	var head := _head_canvas_rect(tip)
+	var gap := 10.0
 	var left := 0.0
-	var top := 0.0
+	var top := clampf(head.position.y - bh * 0.35, margin, vp.y - bh - margin)
 	var placed := false
-	for side in [1.0, -1.0]:
-		var l: float = tip.x + head_r * 0.7 if side > 0.0 else tip.x - head_r * 0.7 - bw
+	var prefer_left := tip.x > vp.x * 0.62
+	for side in ([-1.0, 1.0] if prefer_left else [1.0, -1.0]):
+		var l: float = head.end.x + gap if side > 0.0 else head.position.x - gap - bw
 		if l >= margin and l + bw <= vp.x - margin:
 			left = l
-			top = tip.y - bh * 0.95
 			placed = true
 			break
 	if not placed:
-		left = tip.x - bw * 0.5
-		top = tip.y - bh - 18.0
-		if str(_cat.get("action_phase")) == "feed":
-			top = tip.y - bh - 28.0
+		left = clampf(head.get_center().x - bw * 0.5, margin, maxf(margin, vp.x - bw - margin))
+		top = head.position.y - bh - 14.0
 	left = clampf(left, margin, maxf(margin, vp.x - bw - margin))
 	top = clampf(top, margin, maxf(margin, vp.y - bh - margin))
 	position = Vector2(left, top)

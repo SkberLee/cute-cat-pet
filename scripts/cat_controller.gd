@@ -96,6 +96,7 @@ var _wander_speed: float = WALK_SPEED
 var _blink_timer: float = 2.4
 var _auto_timer: float = 3.5
 var _auto_busy: bool = false
+var _auto_hold: float = 0.0
 var _facing: String = "down"  # down, up, left, right
 var _facing_right: bool = false
 var _move_speed: float = 0.0
@@ -153,27 +154,36 @@ func get_focus_point() -> Vector2:
 	return get_head_point()
 
 func get_head_point() -> Vector2:
+	# v0.3 model sheet: head centre is frame y≈25 (front/back) / (44, 26) side.
 	match _facing:
 		"up":
-			return global_position + Vector2(0.0, -50.0)
+			return global_position + Vector2(0.0, -37.0)
 		"left":
-			return global_position + Vector2(-8.0, -48.0)
+			return global_position + Vector2(-12.0, -36.0)
 		"right":
-			return global_position + Vector2(8.0, -48.0)
+			return global_position + Vector2(12.0, -36.0)
 		_:
-			return global_position + Vector2(0.0, -52.0)
+			return global_position + Vector2(0.0, -37.0)
 
 func get_mouth_point() -> Vector2:
 	# Mouth is above the paws in 2D (smaller y). Back view has no muzzle, use the nape.
 	match _facing:
 		"up":
-			return global_position + Vector2(0.0, -40.0)
-		"left":
-			return global_position + Vector2(-12.0, -30.0)
-		"right":
-			return global_position + Vector2(12.0, -30.0)
-		_:
 			return global_position + Vector2(0.0, -30.0)
+		"left":
+			return global_position + Vector2(-21.0, -31.0)
+		"right":
+			return global_position + Vector2(21.0, -31.0)
+		_:
+			return global_position + Vector2(0.0, -31.0)
+
+## Top of the ears in world space (speech bubble keeps clear of the whole head).
+func get_head_rect() -> Rect2:
+	var c := get_head_point()
+	var half_w := 15.0 if _facing in ["down", "up"] else 13.0
+	if String(anim.animation if anim else "") in ["eat_side", "chew_side", "eat"]:
+		c += Vector2(4.0 if _facing == "right" else -4.0, 14.0)
+	return Rect2(c - Vector2(half_w, 16.0), Vector2(half_w * 2.0, 28.0))
 
 func do_pet() -> void:
 	if not _begin("pet"):
@@ -181,8 +191,11 @@ func do_pet() -> void:
 	_cancel_autonomy()
 	if stats:
 		stats.pet()
+	_face_dir(Vector2(0, 1))
 	_play_oneshot(CLIP_PET)
-	pet_stroke.emit(maxf(_cooldown, 1.2))
+	# Hold the petted pose (eyes closed, leaning into the hand) for the whole stroke.
+	_cooldown = 1.5
+	pet_stroke.emit(1.5)
 	_say(_pick(_lines_for("pet")))
 	_play_sfx(_sfx_pet)
 	_apply_cosmetics_for_bond(stats.bond if stats else 0.0)
@@ -225,6 +238,8 @@ func _process(delta: float) -> void:
 			_cooldown = 0.0
 			if action_phase == "":
 				interaction_ready.emit()
+				if not _wandering and anim and String(anim.animation) in ["call", "happy", "idle_alt"]:
+					_play_idle()
 	if stats:
 		stats.tick(delta)
 		_save_timer += delta
@@ -239,8 +254,15 @@ func _process(delta: float) -> void:
 	if _settling:
 		_tick_settle(delta)
 		return
+	if _auto_busy and _auto_hold > 0.0:
+		_auto_hold -= delta
+		if _auto_hold <= 0.0:
+			_auto_busy = false
+			_play_idle()
+			_auto_timer = _rng.randf_range(1.5, 3.2)
+	# Standing idles blink inside their own 16-frame loop; only the loaf sit swaps clips.
 	_blink_timer -= delta
-	if _blink_timer <= 0.0 and anim and String(anim.animation) in [CLIP_IDLE, "idle", "idle_down"]:
+	if _blink_timer <= 0.0 and anim and String(anim.animation) in [CLIP_IDLE, "idle"]:
 		_play("sit_blink")
 		_blink_timer = _rng.randf_range(2.6, 5.2)
 	if _cooldown > 0.0 or _autonomy_paused:
@@ -363,7 +385,7 @@ func _apply_flip() -> void:
 		return
 	# Only flip the side sheet. Never flip front/back.
 	var clip := String(anim.animation)
-	var is_side := clip.ends_with("_side") or clip == "sit_side" or clip == "walk" or clip == "run"
+	var is_side := clip.ends_with("_side") or clip in ["walk", "run", "eat", "attack"]
 	anim.flip_h = is_side and _facing == "left"
 
 func _play_locomotion(fast: bool) -> void:
@@ -387,6 +409,9 @@ func _play_idle() -> void:
 	_play(_idle_clip)
 	_apply_flip()
 
+func _play_clip() -> String:
+	return "play_side" if _facing in ["left", "right"] else "play_down"
+
 func _play_oneshot(clip: String) -> void:
 	_play(clip)
 	var length := PixelUtil.anim_len(anim, clip)
@@ -394,6 +419,9 @@ func _play_oneshot(clip: String) -> void:
 
 func _on_anim_finished(_anim_name: StringName = &"") -> void:
 	if action_phase != "" or _wandering:
+		return
+	if anim and String(anim.animation) == "sit_blink":
+		_play(CLIP_IDLE)
 		return
 	if _auto_busy:
 		_auto_busy = false
@@ -405,6 +433,7 @@ func _on_anim_finished(_anim_name: StringName = &"") -> void:
 func _cancel_autonomy() -> void:
 	_wandering = false
 	_auto_busy = false
+	_auto_hold = 0.0
 	_settling = false
 	_turning = false
 	_pending_facing = ""
@@ -416,17 +445,26 @@ func _choose_autonomy() -> void:
 	if roll <= 5:
 		_start_wander()
 	elif roll == 6:
+		_face_dir(Vector2(0, 1))
 		_play("happy")
 		_auto_busy = true
+		_auto_hold = 1.6
 		_say(_pick(LINES_AUTO), true)
 	elif roll == 7:
 		_play("sleep")
 		_idle_clip = "sleep"
 		_auto_timer = _rng.randf_range(6.0, 10.0)
 	elif roll == 8:
-		_play("call")
+		# settle into a loaf sit facing the current way for a few seconds
+		var sit_clip := "sit"
+		match _facing:
+			"up":
+				sit_clip = "sit_up"
+			"left", "right":
+				sit_clip = "sit_side"
+		_play(sit_clip)
 		_auto_busy = true
-		_say(_pick(LINES_AUTO), true)
+		_auto_hold = _rng.randf_range(2.5, 4.0)
 	else:
 		_start_wander()
 
@@ -446,6 +484,8 @@ func _start_wander(target = null) -> void:
 	if dest.distance_to(position) <= STOP_DIST:
 		return
 	_wander_target = dest
+	if action_phase == "" and speech_bubble and speech_bubble.has_method("dismiss"):
+		speech_bubble.dismiss()
 	_wandering = true
 	_settling = false
 	_wander_speed = WALK_SPEED if _rng.randf() > 0.25 else RUN_SPEED
@@ -604,7 +644,9 @@ func _approach_point(target: Vector2) -> Vector2:
 
 func _place_food(item_id: String) -> Node2D:
 	var n := CatProps.make_food_2d(item_id)
-	_add_prop(n, _prop_drop())
+	var side := 1.0 if position.x < 160.0 else -1.0
+	var drop := _clamp_floor(position + Vector2(44.0 * side, 6.0))
+	_add_prop(n, drop)
 	return n
 
 func _place_toy(item_id: String) -> Node2D:
@@ -657,24 +699,36 @@ func _run_feed(food_id: String) -> void:
 	var dish := _place_food(food_id)
 	_say(_pick(lines["start"]), true)
 	_play_sfx(_sfx_feed)
-	await _walk_to(_approach_point(dish.global_position), WALK_SPEED)
+	var spot := _eat_spot(dish.global_position)
+	await _walk_to(spot, WALK_SPEED)
 	if not is_inside_tree():
 		return
-	_face_point(dish.global_position)
+	# Eat side-on so the head dips into the bowl in front of the snout.
+	_face_dir(Vector2(signf(dish.global_position.x - global_position.x), 0.0))
 	action_phase = "eat"
-	_play(CLIP_FEED)
-	if anim and anim.sprite_frames:
-		anim.sprite_frames.set_animation_loop(CLIP_FEED, true)
+	_play("eat_side")
 	if stats:
 		stats.feed_with(float(spec["hunger"]), float(spec["mood"]))
 	_say(_pick(lines["eat"]), true)
-	await get_tree().create_timer(PixelUtil.anim_len(anim, CLIP_FEED) * 2.0).timeout
-	if anim and anim.sprite_frames:
-		anim.sprite_frames.set_animation_loop(CLIP_FEED, false)
+	await get_tree().create_timer(2.0 / 7.0).timeout
+	_play("chew_side")
+	await get_tree().create_timer(2.2).timeout
+	_face_dir(Vector2(0, 1))
 	_play("happy")
-	await get_tree().create_timer(0.45).timeout
+	await get_tree().create_timer(0.6).timeout
 	_cleanup_props()
 	_finish_sequence("feed")
+
+## Where to stand so the dish sits right under the snout (bowl ~24px ahead, 1px nearer the camera).
+func _eat_spot(dish_pos: Vector2) -> Vector2:
+	var from_left := global_position.x <= dish_pos.x
+	for attempt in 2:
+		var side := -1.0 if from_left else 1.0
+		var spot := dish_pos + Vector2(24.0 * side, -1.0)
+		if absf(_clamp_floor(spot).x - spot.x) < 0.5:
+			return _clamp_floor(spot)
+		from_left = not from_left
+	return _clamp_floor(dish_pos + Vector2(-24.0, -1.0))
 
 func _run_play(toy_id: String) -> void:
 	_cancel_autonomy()
@@ -724,8 +778,8 @@ func _play_wand(toy: Node2D) -> void:
 		var hop := base + Vector2(_rng.randf_range(-18, 18), _rng.randf_range(-6, 6))
 		toy.global_position = hop
 		await _walk_to(_approach_point(hop), RUN_SPEED)
-		_play(CLIP_PLAY)
-		await get_tree().create_timer(PixelUtil.anim_len(anim, CLIP_PLAY)).timeout
+		_play(_play_clip())
+		await get_tree().create_timer(PixelUtil.anim_len(anim, _play_clip())).timeout
 
 func _play_yarn(toy: Node2D) -> void:
 	var center := toy.global_position
@@ -742,8 +796,8 @@ func _play_laser(toy: Node2D) -> void:
 		var p := _random_floor()
 		toy.global_position = p
 		await _walk_to(p, RUN_SPEED)
-		_play(CLIP_PLAY)
-		await get_tree().create_timer(0.28).timeout
+		_play(_play_clip())
+		await get_tree().create_timer(0.45).timeout
 
 func _play_mouse(toy: Node2D) -> void:
 	var start := toy.global_position
@@ -759,6 +813,6 @@ func _play_mouse(toy: Node2D) -> void:
 			toy.global_position = from.lerp(scurries, clampf(t / 0.35, 0.0, 1.0))
 			await get_tree().process_frame
 		await _walk_to(_approach_point(toy.global_position), RUN_SPEED)
-		_play(CLIP_PLAY)
-		await get_tree().create_timer(PixelUtil.anim_len(anim, CLIP_PLAY) * 0.7).timeout
+		_play(_play_clip())
+		await get_tree().create_timer(PixelUtil.anim_len(anim, _play_clip()) * 0.8).timeout
 		start = toy.global_position

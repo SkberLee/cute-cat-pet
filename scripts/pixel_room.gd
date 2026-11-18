@@ -41,11 +41,24 @@ func _build() -> void:
 		for x in range(0, int(SIZE.x), TILE):
 			_tile(floor_root, floor_tex, x, y)
 	# Unique furniture may already exist in the packed scene.
-	_ensure_unique("Curtain", _make_curtain(), Vector2(8, 4), false)
+	# Window with tie-back curtains (tinted by the dress-up theme as "Curtain").
+	_ensure_unique("Curtain", PixelUtil.sprite("res://assets/pixel/room/window.png", false), Vector2(132, 6), false)
+	_deco("Picture", "res://assets/pixel/room/picture.png", Vector2(74, 14))
+	_deco("Shelf", "res://assets/pixel/room/shelf.png", Vector2(210, 12))
+	_deco("Clock", "res://assets/pixel/room/clock.png", Vector2(282, 10))
+	_deco("Plant", "res://assets/pixel/room/plant.png", Vector2(290, 58))
 	_ensure_sprite("Lamp", "res://assets/pixel/room/lamp.png", Vector2(20, 36))
 	_ensure_unique("Rug", PixelUtil.sprite("res://assets/pixel/room/rug.png"), Vector2(160, 164), true)
 	_ensure_unique("Cushion", PixelUtil.sprite("res://assets/pixel/room/ottoman.png"), Vector2(52, 190), true)
 	_ensure_sprite("Box", "res://assets/pixel/room/box.png", Vector2(268, 152))
+
+func _deco(n: String, path: String, pos: Vector2) -> void:
+	if get_node_or_null(n):
+		return
+	var s := PixelUtil.sprite(path, false)
+	s.name = n
+	s.position = pos
+	add_child(s)
 
 func _tile(parent: Node2D, tex: Texture2D, x: int, y: int) -> void:
 	var s := Sprite2D.new()
