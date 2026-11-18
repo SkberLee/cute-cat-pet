@@ -4,7 +4,7 @@ extends SceneTree
 ## No teleports after the start. Writes /tmp/record/demo_done before quitting.
 
 const W := 540
-const H := 1200
+const H := 1140  # bottom ~45px of the :7 desktop is covered by a panel
 
 func _init() -> void:
 	call_deferred("_run")
@@ -56,11 +56,11 @@ func _run() -> void:
 	ui._on_theme()
 	await _wait(1.8)
 	# walks in every facing
-	await _walk(cat, Vector2(250, 150))
-	await _walk(cat, Vector2(250, 190))
-	await _walk(cat, Vector2(90, 190))
-	await _walk(cat, Vector2(90, 108))
-	await _walk(cat, Vector2(160, 160))
+	await _walk(cat, Vector2(222, 150))
+	await _walk(cat, Vector2(222, 212))
+	await _walk(cat, Vector2(100, 212))
+	await _walk(cat, Vector2(100, 112))
+	await _walk(cat, Vector2(160, 165))
 	cat._face_dir(Vector2(0, 1))
 	cat._play_idle()
 	await _wait(2.4)

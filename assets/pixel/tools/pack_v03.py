@@ -40,9 +40,9 @@ def pack_all(pack_sprite, ref_cat, finalize=True):
     manifest = {}
     for name, (frames, fps, loop) in anims.items():
         path = PIX / "cat" / f"{name}.aseprite"
-        pack_sprite(path, 64, 64, [f.bytes() for f in frames], ref_cat, duration=int(1000 / fps))
+        pack_sprite(path, cat_art.W, cat_art.H, [f.bytes() for f in frames], ref_cat, duration=int(1000 / fps))
         if len(frames) == 1:
-            Image.frombytes("RGBA", (64, 64), frames[0].bytes()).save(PIX / "cat" / f"{name}_0.png")
+            Image.frombytes("RGBA", (cat_art.W, cat_art.H), frames[0].bytes()).save(PIX / "cat" / f"{name}_0.png")
         manifest[name] = (len(frames), fps, loop)
         if finalize:
             _finalize(path)

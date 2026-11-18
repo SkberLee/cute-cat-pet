@@ -25,7 +25,10 @@ const SETTLE_TIME := 0.12
 const FACE_HYST := 1.40
 const FLOOR_MIN := Vector2(36, 100)
 const FLOOR_MAX := Vector2(284, 196)
-const SPRITE_OFFSET := Vector2(-32, -62)
+## Walkable floor; main_ui narrows it in portrait so the cat stays inside the framed room.
+var floor_min := FLOOR_MIN
+var floor_max := FLOOR_MAX
+const SPRITE_OFFSET := Vector2(-48, -92)  # v0.3.1: 96x96 frames, sole row 90
 
 const LINES_PET := ["呼噜～再摸摸", "嗯…好舒服呀", "贴贴～喜欢你", "轻轻的…再来一下"]
 const LINES_PET_SWEET := ["只准你摸哦～", "心心都给你了", "再贴紧一点…", "你的手好暖呀"]
@@ -135,6 +138,12 @@ func _ready() -> void:
 	_blink_timer = _rng.randf_range(2.2, 4.8)
 	call_deferred("_say", "来摸摸我吧～", false)
 
+func set_floor(minp: Vector2, maxp: Vector2) -> void:
+	floor_min = minp
+	floor_max = maxp
+	if position.x < minp.x or position.x > maxp.x or position.y < minp.y or position.y > maxp.y:
+		position = _clamp_floor(position)
+
 func can_interact() -> bool:
 	return _cooldown <= 0.0
 
@@ -154,36 +163,36 @@ func get_focus_point() -> Vector2:
 	return get_head_point()
 
 func get_head_point() -> Vector2:
-	# v0.3 model sheet: head centre is frame y≈25 (front/back) / (44, 26) side.
+	# v0.3.1 chibi model sheet (80px frames): big head centre ~40px above the feet.
 	match _facing:
 		"up":
-			return global_position + Vector2(0.0, -37.0)
+			return global_position + Vector2(0.0, -48.0)
 		"left":
-			return global_position + Vector2(-12.0, -36.0)
+			return global_position + Vector2(-12.0, -46.0)
 		"right":
-			return global_position + Vector2(12.0, -36.0)
+			return global_position + Vector2(12.0, -46.0)
 		_:
-			return global_position + Vector2(0.0, -37.0)
+			return global_position + Vector2(0.0, -48.0)
 
 func get_mouth_point() -> Vector2:
 	# Mouth is above the paws in 2D (smaller y). Back view has no muzzle, use the nape.
 	match _facing:
 		"up":
-			return global_position + Vector2(0.0, -30.0)
+			return global_position + Vector2(0.0, -36.0)
 		"left":
-			return global_position + Vector2(-21.0, -31.0)
+			return global_position + Vector2(-34.0, -40.0)
 		"right":
-			return global_position + Vector2(21.0, -31.0)
+			return global_position + Vector2(34.0, -40.0)
 		_:
-			return global_position + Vector2(0.0, -31.0)
+			return global_position + Vector2(0.0, -35.0)
 
-## Top of the ears in world space (speech bubble keeps clear of the whole head).
+## Whole head incl. ears in world space (speech bubble keeps clear of it).
 func get_head_rect() -> Rect2:
 	var c := get_head_point()
-	var half_w := 15.0 if _facing in ["down", "up"] else 13.0
+	var half_w := 27.0 if _facing in ["down", "up"] else 23.0
 	if String(anim.animation if anim else "") in ["eat_side", "chew_side", "eat"]:
-		c += Vector2(4.0 if _facing == "right" else -4.0, 14.0)
-	return Rect2(c - Vector2(half_w, 16.0), Vector2(half_w * 2.0, 28.0))
+		c += Vector2(6.0 if _facing == "right" else -6.0, 15.0)
+	return Rect2(c - Vector2(half_w, 29.0), Vector2(half_w * 2.0, 53.0))
 
 func do_pet() -> void:
 	if not _begin("pet"):
@@ -477,7 +486,7 @@ func _start_wander(target = null) -> void:
 		var t3: Vector3 = target
 		var nx := inverse_lerp(-2.3, 2.3, t3.x)
 		var ny := inverse_lerp(-1.55, 1.55, t3.z)
-		dest = Vector2(lerp(FLOOR_MIN.x, FLOOR_MAX.x, nx), lerp(FLOOR_MIN.y, FLOOR_MAX.y, ny))
+		dest = Vector2(lerp(floor_min.x, floor_max.x, nx), lerp(floor_min.y, floor_max.y, ny))
 	else:
 		dest = _random_floor()
 	dest = _clamp_floor(dest)
@@ -623,15 +632,15 @@ func _face_point(p: Vector2) -> void:
 
 func _random_floor() -> Vector2:
 	for _i in 8:
-		var p := Vector2(_rng.randf_range(FLOOR_MIN.x, FLOOR_MAX.x), _rng.randf_range(FLOOR_MIN.y, FLOOR_MAX.y))
+		var p := Vector2(_rng.randf_range(floor_min.x, floor_max.x), _rng.randf_range(floor_min.y, floor_max.y))
 		p = _clamp_floor(p)
 		if p.distance_to(position) > 24.0:
 			return p
 	return _clamp_floor(Vector2(160, 150))
 
 func _clamp_floor(p: Vector2) -> Vector2:
-	p.x = clampf(p.x, FLOOR_MIN.x, FLOOR_MAX.x)
-	p.y = clampf(p.y, FLOOR_MIN.y, FLOOR_MAX.y)
+	p.x = clampf(p.x, floor_min.x, floor_max.x)
+	p.y = clampf(p.y, floor_min.y, floor_max.y)
 	if p.x < 70.0 and p.y > 166.0:
 		p.x = 70.0
 	if p.x > 260.0 and p.y > 154.0:
@@ -639,13 +648,22 @@ func _clamp_floor(p: Vector2) -> Vector2:
 	return p
 
 func _approach_point(target: Vector2) -> Vector2:
-	var p := target + Vector2(-18.0 if target.x > position.x else 18.0, 2.0)
-	return _clamp_floor(p)
+	# Stand so the toy sits just past the snout (side-on), cat a hair behind it in y-sort.
+	var p := target + Vector2(-40.0 if target.x > position.x else 40.0, -2.0)
+	var c := _clamp_floor(p)
+	if absf(c.x - p.x) > 0.5:  # blocked by a wall: approach from the other side
+		c = _clamp_floor(target + Vector2(40.0 if target.x > position.x else -40.0, -2.0))
+	return c
+
+## Turn side-on toward a toy and pounce at it.
+func _pounce_at(p: Vector2) -> void:
+	_face_dir(Vector2(signf(p.x - global_position.x) if absf(p.x - global_position.x) > 0.5 else 1.0, 0.0))
+	_play("play_side")
 
 func _place_food(item_id: String) -> Node2D:
 	var n := CatProps.make_food_2d(item_id)
 	var side := 1.0 if position.x < 160.0 else -1.0
-	var drop := _clamp_floor(position + Vector2(44.0 * side, 6.0))
+	var drop := _clamp_floor(position + Vector2(60.0 * side, 6.0))
 	_add_prop(n, drop)
 	return n
 
@@ -724,11 +742,11 @@ func _eat_spot(dish_pos: Vector2) -> Vector2:
 	var from_left := global_position.x <= dish_pos.x
 	for attempt in 2:
 		var side := -1.0 if from_left else 1.0
-		var spot := dish_pos + Vector2(24.0 * side, -1.0)
+		var spot := dish_pos + Vector2(40.0 * side, -1.0)
 		if absf(_clamp_floor(spot).x - spot.x) < 0.5:
 			return _clamp_floor(spot)
 		from_left = not from_left
-	return _clamp_floor(dish_pos + Vector2(-24.0, -1.0))
+	return _clamp_floor(dish_pos + Vector2(-40.0, -1.0))
 
 func _run_play(toy_id: String) -> void:
 	_cancel_autonomy()
@@ -778,8 +796,8 @@ func _play_wand(toy: Node2D) -> void:
 		var hop := base + Vector2(_rng.randf_range(-18, 18), _rng.randf_range(-6, 6))
 		toy.global_position = hop
 		await _walk_to(_approach_point(hop), RUN_SPEED)
-		_play(_play_clip())
-		await get_tree().create_timer(PixelUtil.anim_len(anim, _play_clip())).timeout
+		_pounce_at(toy.global_position)
+		await get_tree().create_timer(PixelUtil.anim_len(anim, "play_side")).timeout
 
 func _play_yarn(toy: Node2D) -> void:
 	var center := toy.global_position
@@ -795,8 +813,8 @@ func _play_laser(toy: Node2D) -> void:
 	for i in 4:
 		var p := _random_floor()
 		toy.global_position = p
-		await _walk_to(p, RUN_SPEED)
-		_play(_play_clip())
+		await _walk_to(_approach_point(p), RUN_SPEED)
+		_pounce_at(p)
 		await get_tree().create_timer(0.45).timeout
 
 func _play_mouse(toy: Node2D) -> void:
@@ -813,6 +831,6 @@ func _play_mouse(toy: Node2D) -> void:
 			toy.global_position = from.lerp(scurries, clampf(t / 0.35, 0.0, 1.0))
 			await get_tree().process_frame
 		await _walk_to(_approach_point(toy.global_position), RUN_SPEED)
-		_play(_play_clip())
-		await get_tree().create_timer(PixelUtil.anim_len(anim, _play_clip()) * 0.8).timeout
+		_pounce_at(toy.global_position)
+		await get_tree().create_timer(PixelUtil.anim_len(anim, "play_side") * 0.8).timeout
 		start = toy.global_position

@@ -40,17 +40,40 @@ func _build() -> void:
 	for y in range(WALL_H, 208 + 320, TILE):
 		for x in range(0, int(SIZE.x), TILE):
 			_tile(floor_root, floor_tex, x, y)
-	# Unique furniture may already exist in the packed scene.
-	# Window with tie-back curtains (tinted by the dress-up theme as "Curtain").
-	_ensure_unique("Curtain", PixelUtil.sprite("res://assets/pixel/room/window.png", false), Vector2(132, 6), false)
-	_deco("Picture", "res://assets/pixel/room/picture.png", Vector2(74, 14))
-	_deco("Shelf", "res://assets/pixel/room/shelf.png", Vector2(210, 12))
-	_deco("Clock", "res://assets/pixel/room/clock.png", Vector2(282, 10))
+	# Wall dressing — composed around the window so a portrait crop (x 48..272) frames it.
+	_ensure_unique("Curtain", PixelUtil.sprite("res://assets/pixel/room/window.png", false), Vector2(132, 4), false)
+	_deco("Picture", "res://assets/pixel/room/picture.png", Vector2(84, 14))
+	_deco("Shelf", "res://assets/pixel/room/shelf.png", Vector2(200, 20))
+	_deco("Clock", "res://assets/pixel/room/clock.png", Vector2(234, 0))
+	# Upper wall (only visible in the taller portrait framing).
+	_deco("Bunting", "res://assets/pixel/room/bunting.png", Vector2(56, -58))
+	_deco("Photo", "res://assets/pixel/room/photo.png", Vector2(96, -30))
+	_deco("Photo2", "res://assets/pixel/room/picture.png", Vector2(200, -32))
+	# Floor furniture: everything stands on the floor with a contact shadow.
 	_deco("Plant", "res://assets/pixel/room/plant.png", Vector2(290, 58))
-	_ensure_sprite("Lamp", "res://assets/pixel/room/lamp.png", Vector2(20, 36))
+	_deco("Lamp", "res://assets/pixel/room/tree.png", Vector2(14, 48))
 	_ensure_unique("Rug", PixelUtil.sprite("res://assets/pixel/room/rug.png"), Vector2(160, 164), true)
-	_ensure_unique("Cushion", PixelUtil.sprite("res://assets/pixel/room/ottoman.png"), Vector2(52, 190), true)
+	_ensure_unique("Cushion", PixelUtil.sprite("res://assets/pixel/room/cat_bed.png"), Vector2(56, 184), true)
+	var cushion := get_node_or_null("Cushion") as Sprite2D
+	if cushion:
+		cushion.texture = PixelUtil.tex("res://assets/pixel/room/cat_bed.png")
 	_ensure_sprite("Box", "res://assets/pixel/room/box.png", Vector2(268, 152))
+	layout(false)
+
+## Portrait shows a narrower, taller slice of the room: pull floor furniture into
+## that slice so nothing is cut in half and the floor below the cat isn't empty.
+func layout(portrait: bool) -> void:
+	var pos := {
+		"Rug": Vector2(160, 178) if portrait else Vector2(160, 164),
+		"Cushion": Vector2(100, 238) if portrait else Vector2(56, 184),
+		"Box": Vector2(206, 232) if portrait else Vector2(268, 152),
+		"Lamp": Vector2(68, 46) if portrait else Vector2(14, 48),
+		"Plant": Vector2(226, 58) if portrait else Vector2(290, 58),
+	}
+	for n in pos:
+		var s := get_node_or_null(n) as Node2D
+		if s:
+			s.position = pos[n]
 
 func _deco(n: String, path: String, pos: Vector2) -> void:
 	if get_node_or_null(n):

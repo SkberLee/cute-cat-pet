@@ -305,6 +305,183 @@ ASSETS = {
     "ui/panel_mood": panel_frame,
 }
 
+
+# ---------------------------------------------------------------- v0.3.1 room pass
+def wallpaper():
+    """32x32 seamless wallpaper: warm peach with soft stripes and tiny flowers."""
+    g = Px(32, 32)
+    base, band, dot, dot_c = (252, 236, 224), (247, 226, 212), (240, 196, 190), (250, 224, 170)
+    for y in range(32):
+        for x in range(32):
+            g.put(x, y, band if (x % 16) in (6, 7, 8, 9) else base)
+    for (cx, cy) in ((15, 7), (31, 23)):
+        for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1)):
+            g.put((cx + dx) % 32, (cy + dy) % 32, dot)
+        g.put(cx % 32, cy % 32, dot_c)
+    for (cx, cy) in ((4, 18), (20, 2)):
+        g.put(cx, cy, (244, 212, 200))
+    return g.im
+
+
+def wainscot():
+    """32x32 tile placed at wall y 40..72: wallpaper on top, chair rail, panel, baseboard."""
+    g = Px(32, 32)
+    rail_l, rail, rail_d = (236, 206, 170), (214, 178, 140), (176, 136, 102)
+    pan, pan_l, pan_d = (246, 228, 206), (252, 240, 224), (220, 196, 170)
+    for y in range(9, 32):
+        for x in range(32):
+            g.put(x, y, pan)
+    g.hline(0, 31, 9, rail_l)
+    g.hline(0, 31, 10, rail)
+    g.hline(0, 31, 11, rail)
+    g.hline(0, 31, 12, rail_d)
+    # recessed panel (bevel)
+    g.hline(3, 28, 15, pan_d)
+    g.vline(3, 15, 24, pan_d)
+    g.hline(3, 28, 25, pan_l)
+    g.vline(28, 15, 25, pan_l)
+    # baseboard
+    g.hline(0, 31, 27, rail_l)
+    g.rect(0, 28, 31, 30, rail)
+    g.hline(0, 31, 31, rail_d)
+    return g.im
+
+
+def floor32():
+    """Calm honey wood: long planks (few joints), soft seams, very sparse grain."""
+    g = Px(32, 32)
+    cols = [(228, 190, 142), (224, 185, 137), (229, 192, 144), (225, 187, 139)]
+    seam, grain, joint = (210, 168, 120), (220, 180, 132), (208, 165, 118)
+    for row in range(4):
+        y0 = row * 8
+        for y in range(y0, y0 + 8):
+            for x in range(32):
+                g.put(x, y, cols[row])
+        g.hline(0, 31, y0 + 7, seam)
+        if row in (0, 2):  # only every other plank has a butt joint in this tile
+            jx = 9 if row == 0 else 25
+            g.vline(jx, y0, y0 + 6, joint)
+        if row in (1, 3):
+            gx = 6 if row == 1 else 18
+            for k in range(4):
+                g.put(gx + k, y0 + 3, grain)
+    return g.im
+
+
+def tree():
+    """32x52 potted ficus that sits on the floor (pot + contact shadow baked in)."""
+    g = Px(32, 52)
+    lv, lv_l, lv_d, lv_h = (124, 178, 108), (156, 204, 128), (86, 140, 86), (196, 230, 160)
+    trunk, trunk_d = (150, 104, 70), (116, 78, 52)
+    pot, pot_l, pot_d, rim = (214, 128, 92), (232, 156, 116), (180, 100, 72), (238, 170, 128)
+    # trunk
+    g.rect(15, 22, 16, 38, trunk)
+    g.vline(16, 22, 38, trunk_d)
+    g.put(14, 30, trunk); g.put(13, 29, trunk)
+    # canopy: three overlapping puffs
+    for cx, cy, r in ((10, 14, 7), (21, 13, 7.5), (16, 8, 7), (15, 18, 7)):
+        g.ellipse(cx, cy, r, r * 0.9, lv)
+    for cx, cy, r in ((9, 12, 4), (19, 9, 4), (15, 6, 3)):
+        g.ellipse(cx - 1, cy - 1, r, r * 0.8, lv_l)
+    for (x, y) in ((8, 10), (17, 6), (22, 10), (13, 4)):
+        g.put(x, y, lv_h)
+    for y in range(16, 26):
+        for x in range(2, 30):
+            if g.p[x, y][3] and y > 19 and g.p[x, y][:3] == lv:
+                g.put(x, y, lv_d)
+    g.outline()
+    # pot (tapered) with rim
+    for y in range(38, 49):
+        w = 8 - (y - 38) * 0.25
+        for x in range(int(16 - w), int(16 + w) + 1):
+            g.put(x, y, pot_l if x < 13 else (pot_d if x > 19 else pot))
+    g.rect(6, 36, 25, 38, rim)
+    g.hline(6, 25, 39, pot_d)
+    # outline pot
+    for y in range(35, 50):
+        for x in range(4, 28):
+            if g.p[x, y][3] == 0 and any(0 <= x + dx < 32 and g.p[x + dx, y + dy][3] == 255 and g.p[x + dx, y + dy][:3] != (104, 54, 36)
+                                       for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)) if 0 <= y + dy < 52):
+                g.put(x, y, OUT)
+    # soft contact shadow on the floor
+    for x in range(5, 27):
+        for y, a in ((50, 70), (51, 40)):
+            if g.p[x, y][3] == 0 and not (y == 51 and x in (5, 6, 25, 26)):
+                g.put(x, y, (120, 80, 60, a))
+    return g.im
+
+
+def cat_bed():
+    """48x32 round cat bed (light so the dress-up tint shows), cushion + heart."""
+    g = Px(48, 32)
+    rim, rim_l, rim_d = (248, 238, 236), (255, 250, 248), (222, 206, 206)
+    inner, inner_d, cush, cush_l = (232, 214, 214), (210, 190, 192), (255, 246, 240), (255, 255, 252)
+    g.ellipse(24, 19, 22, 10.5, rim)
+    g.ellipse(24, 16, 20, 7, rim_l, clip=lambda x, y: y < 15)
+    g.ellipse(24, 16, 16, 6, inner)
+    g.ellipse(24, 18, 14, 4.6, inner_d, clip=lambda x, y: y < 17)
+    g.ellipse(24, 18, 13, 4.4, cush)
+    g.ellipse(21, 17, 7, 2.2, cush_l)
+    for x in range(3, 46):
+        for y in range(23, 30):
+            if g.p[x, y][3] and g.p[x, y][:3] == rim:
+                g.put(x, y, rim_d)
+    # little heart on the front rim
+    for (x, y) in ((22, 24), (23, 24), (25, 24), (26, 24), (22, 25), (23, 25), (24, 25), (25, 25), (26, 25), (23, 26), (24, 26), (25, 26), (24, 27)):
+        g.put(x, y, (240, 150, 160))
+    g.put(24, 24, (240, 150, 160))
+    g.outline(OUT_SOFT)
+    for x in range(4, 44):
+        if g.p[x, 31][3] == 0:
+            g.put(x, 31, (120, 80, 60, 60))
+    return g.im
+
+
+def bunting():
+    """208x18 pastel flag garland for the upper wall (portrait shows more wall)."""
+    g = Px(208, 18)
+    string = (176, 136, 120)
+    flags = [(246, 170, 176), (250, 222, 150), (170, 214, 196), (176, 200, 236), (232, 186, 230)]
+    pts = []
+    for x in range(208):
+        y = 2 + int(round(4 * math.sin(math.pi * x / 207)))
+        pts.append(y)
+        g.put(x, y, string)
+    for i, x0 in enumerate(range(6, 200, 16)):
+        col = flags[i % len(flags)]
+        y0 = pts[x0 + 5] + 1
+        for j in range(9):
+            for x in range(x0 + j // 2, x0 + 11 - j // 2):
+                g.put(x, y0 + j, col)
+        for x in range(x0, x0 + 11):
+            g.put(x, y0, tuple(min(255, c + 18) for c in col))
+    return g.im
+
+
+def photo():
+    """20x22 small frame with a paw print."""
+    g = Px(20, 22)
+    fr, fr_d, mat, paw = (204, 156, 110), (168, 120, 84), (252, 244, 232), (236, 156, 160)
+    g.rect(0, 0, 19, 21, fr)
+    g.rect(1, 20, 19, 21, fr_d)
+    g.rect(3, 3, 16, 18, mat)
+    g.ellipse(9.5, 13, 3, 2.4, paw)
+    for (x, y) in ((6, 8), (8, 7), (11, 7), (13, 8)):
+        g.put(x, y, paw); g.put(x, y + 1, paw)
+    g.outline()
+    return g.im
+
+
+ASSETS.update({
+    "room/wall_cream": wallpaper,
+    "room/wall_baseboard": wainscot,
+    "room/floor_wood_32": floor32,
+    "room/tree": tree,
+    "room/cat_bed": cat_bed,
+    "room/bunting": bunting,
+    "room/photo": photo,
+})
+
 if __name__ == "__main__":
     sheet = Image.new("RGBA", (900, 200), (70, 64, 78, 255))
     x = 4

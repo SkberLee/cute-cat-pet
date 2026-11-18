@@ -1,20 +1,20 @@
 #!/bin/bash
-# Record a 540x1200 borderless Godot demo on DISPLAY :7 via ffmpeg x11grab.
+# Record a 540x1140 borderless Godot demo on DISPLAY :7 via ffmpeg x11grab.
 set -euo pipefail
 cd /workspace/cute-cat-pet
 export DISPLAY=${DISPLAY:-:7}
-OUT=${1:-/workspace/cute-cat-pet/screenshots/v034_desktop_play.mp4}
-RAW=/tmp/record/v034_raw.mp4
+OUT=${1:-/workspace/cute-cat-pet/screenshots/v035_desktop_play.mp4}
+RAW=/tmp/record/v035_raw.mp4
 mkdir -p /tmp/record /workspace/cute-cat-pet/screenshots
 rm -f "$RAW" /tmp/record/demo_done
 GODOT=/workspace/xt/bin/Godot_v4.7.2-stable_linux.x86_64
 timeout 120 "$GODOT" --path /workspace/cute-cat-pet -s res://tools/record_demo.gd \
-  --rendering-driver opengl3 --resolution 540x1200 --position 0,0 \
+  --rendering-driver opengl3 --resolution 540x1140 --position 0,0 \
   >/tmp/record/godot.log 2>&1 &
 GPID=$!
 # Start grabbing quickly so the idle + ease-in are in the tape.
 sleep 0.35
-ffmpeg -y -f x11grab -video_size 540x1200 -framerate 30 -draw_mouse 0 -i "${DISPLAY}.0+0,0" \
+ffmpeg -y -f x11grab -video_size 540x1140 -framerate 30 -draw_mouse 0 -i "${DISPLAY}.0+0,0" \
   -c:v libx264 -pix_fmt yuv420p -crf 18 -preset fast "$RAW" \
   >/tmp/record/ffmpeg.log 2>&1 &
 FPID=$!
@@ -36,7 +36,7 @@ python3 - << PY
 from pathlib import Path
 import subprocess
 from PIL import Image
-raw = Path("/tmp/record/v034_raw.mp4")
+raw = Path("/tmp/record/v035_raw.mp4")
 out = Path("$OUT")
 if not raw.exists() or raw.stat().st_size < 10000:
     raise SystemExit("raw recording missing or tiny")

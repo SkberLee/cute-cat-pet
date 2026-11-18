@@ -86,7 +86,8 @@ def cat_frames(prefix):
 
 def anim_sheet(scale=4, cols=8):
     """Every cat animation, every frame, nearest-neighbour ×scale, labelled."""
-    cell = 64 * scale
+    FS = load("cat/idle_down_0.png").width
+    cell = FS * scale
     rows = []
     for prefix, label in CAT_ANIMS:
         fr = cat_frames(prefix)
@@ -96,7 +97,7 @@ def anim_sheet(scale=4, cols=8):
     H = 80 + sum((30 if lab else 0) + cell + 10 for lab, _ in rows)
     c = new_canvas(W, H)
     d = ImageDraw.Draw(c)
-    text(d, (20, 16), "治愈猫 v0.3 · 全部猫咪动画（64×64 帧，×%d 最近邻）" % scale, 30)
+    text(d, (20, 16), "治愈猫 v0.3.1 · 全部猫咪动画（%d×%d 帧，×%d 最近邻）" % (FS, FS, scale), 30)
     y = 70
     for lab, fr in rows:
         if lab:
@@ -254,7 +255,7 @@ def preview_sheet():
 def showcases():
     SHOT.mkdir(exist_ok=True)
     # cat sit 6x
-    bg = new_canvas(64 * 6 + 80, 64 * 6 + 80)
+    bg = new_canvas(96 * 6 + 80, 96 * 6 + 80)
     sit = nn(load("cat/idle_down_0.png"), 6)
     bg.paste(sit, (40, 40), sit)
     p = SHOT / "pixel_preview_cat_sit.png"
@@ -315,5 +316,5 @@ if __name__ == "__main__":
     preview_sheet()
     showcases()
     a = anim_sheet(4)
-    a.convert("RGB").save(SHOT / "v034_anim_sheet.png", optimize=True)
-    print("wrote", SHOT / "v034_anim_sheet.png", a.size)
+    a.convert("RGB").save(SHOT / "v035_anim_sheet.png", optimize=True)
+    print("wrote", SHOT / "v035_anim_sheet.png", a.size)

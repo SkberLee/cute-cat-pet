@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""治愈猫 v0.3 cat sprite set — original, hand-tuned layered pixel art.
+"""治愈猫 v0.3.1 cat sprite set (style C: chibi) — original, hand-tuned layered pixel art.
 
 Not procedural blobs: every facing is built from one shared model sheet
 (fixed head / body / leg anchors), painted with 4-tone ramps under one top
@@ -19,9 +19,10 @@ from dataclasses import dataclass, field
 
 from PIL import Image
 
-W = H = 64
-SOLE = 60          # bottom row of a planted paw
-CX = 31.5          # front/back centre line (pixels 31|32 mirror)
+W = H = 96
+SOLE = 90          # bottom row of a planted paw
+CX = 47.5          # front/back centre line (pixels 47|48 mirror)
+K = 1.5            # model units (authored on a 64 grid, sole 60) -> pixels
 
 # ---------------------------------------------------------------------------
 # Palette — limited ramps
@@ -261,7 +262,7 @@ def outline(c):
             only_below = hit == [(x, y + 1)]
             if white:
                 col = OUT_W
-            elif only_below and y < 40:
+            elif only_below and y < 62:
                 col = OUT_LIT
             else:
                 col = OUT
@@ -307,169 +308,6 @@ def finish(c, shadows=()):
     ground_shadow(c, shadows)
     return c
 
-
-# ---------------------------------------------------------------------------
-# Hand-authored face stamps
-# ---------------------------------------------------------------------------
-EYEMAP = {"e": EYE_D, "g": EYE, "G": EYE_L, "h": EYE_H, "m": MOUTH, "n": NOSE,
-          "p": PINK, "P": PINK_D, "b": BLUSH, "s": STRIPE, "S": STRIPE_D,
-          "w": WHT[0], "W": WHT[2], "o": OUT}
-
-EYE_OPEN = [
-    ".eee.",
-    "ehhee",
-    "ehgge",
-    "egggG",
-    "egGGe",
-    ".eee.",
-]
-EYE_OPEN_R = [  # right eye: same light, highlight still top-left
-    ".eee.",
-    "ehhee",
-    "ehgge",
-    "Gggge",
-    "eGGge",
-    ".eee.",
-]
-EYE_HALF = [
-    ".....",
-    ".....",
-    ".eee.",
-    "eggge",
-    "eGGGe",
-    ".eee.",
-]
-EYE_SHUT = [  # gentle closed (blink / sleep) — downward arc
-    ".....",
-    ".....",
-    ".....",
-    "e...e",
-    ".eee.",
-    ".....",
-]
-EYE_HAPPY = [  # ^ ^
-    ".....",
-    ".....",
-    ".eee.",
-    "e...e",
-    ".....",
-    ".....",
-]
-SIDE_EYE = {
-    "open": [".ee.", "ehge", "eggG", "eGGe", ".ee."],
-    "half": ["....", "....", "eeee", "egGe", ".ee."],
-    "shut": ["....", "....", "....", "e..e", ".ee."],
-    "happy": ["....", ".ee.", "e..e", "....", "...."],
-}
-
-# ---------------------------------------------------------------------------
-# FRONT model sheet
-# ---------------------------------------------------------------------------
-HEAD_F = dict(cx=CX, cy=25.0, rx=14.2, ry=11.4)
-
-
-def _mx(x):
-    return 63 - x
-
-
-def front_head(c, dy=0, eyes="open", dx=0, ears="up", blush=True, mouth="w", part="head"):
-    hx, hy = HEAD_F["cx"] + dx, HEAD_F["cy"] + dy
-    # ears (behind head edge but painted first so head overlaps base)
-    for side in (-1, 1):
-        if ears == "up":
-            tip = (hx + side * 10.0, hy - 15.0)
-            base_o = (hx + side * 14.0, hy - 4.0)
-            base_i = (hx + side * 3.5, hy - 9.5)
-        else:  # flattened / leaning back
-            tip = (hx + side * 12.5, hy - 13.0)
-            base_o = (hx + side * 14.3, hy - 3.0)
-            base_i = (hx + side * 4.5, hy - 9.5)
-        pts = [base_i, tip, base_o]
-
-        def ear_col(x, y, side=side, tip=tip):
-            # lit on the upper edge, deeper toward the base
-            return FUR[1] if y < tip[1] + 6 else FUR[2]
-        poly(c, pts, ear_col, "fur", part + "_ear")
-        # inner ear (pink), hand-placed relative to tip
-        ix = int(round(tip[0])) - (1 if side > 0 else 0)
-        iy = int(round(tip[1])) + 3
-        inner = ["p.", "pp", "Pp", "Ppp"] if side < 0 else [".p", "pp", "pP", "ppP"]
-        for j, row in enumerate(inner):
-            for i, ch in enumerate(row):
-                if ch == ".":
-                    continue
-                xx = ix + (i - (len(row) - 1) if side > 0 else i) + (0 if side < 0 else 0)
-                if side < 0:
-                    xx = ix + i + 0
-                else:
-                    xx = ix - (len(row) - 1) + i + 1
-                c.put(xx, iy + j, EYEMAP[ch], "detail", part + "_ear")
-    ellipse(c, hx, hy, HEAD_F["rx"], HEAD_F["ry"], FUR, "fur", part, bias=0.04)
-    # cheek fluff: slight wider bottom
-    ellipse(c, hx, hy + 4.0, HEAD_F["rx"] + 0.6, 6.0, FUR, "fur", part, bias=0.0,
-            clip=lambda x, y: y >= hy + 3)
-    # white muzzle / chin
-    ellipse(c, hx, hy + 6.4, 5.4, 3.7, WHT, "white", part, bias=0.3)
-    ix, iy = int(math.floor(hx)), int(round(hy))
-    # tabby M on forehead
-    stamp(c, ix, iy - 10, ["ss", "ss", "SS"], EYEMAP, "fur", part)
-    stamp(c, ix - 3, iy - 9, ["s", "s", "S"], EYEMAP, "fur", part)
-    stamp(c, ix + 4, iy - 9, ["s", "s", "S"], EYEMAP, "fur", part)
-    stamp(c, ix - 6, iy - 8, ["s", "S"], EYEMAP, "fur", part)
-    stamp(c, ix + 7, iy - 8, ["s", "S"], EYEMAP, "fur", part)
-    # cheek stripes
-    stamp(c, ix - 13, iy + 1, ["ss.", ".SS"], EYEMAP, "fur", part, only_on=(part,))
-    stamp(c, ix + 12, iy + 1, [".ss", "SS."], EYEMAP, "fur", part, only_on=(part,))
-    # eyes
-    el, er = {"open": (EYE_OPEN, EYE_OPEN_R), "half": (EYE_HALF, EYE_HALF),
-              "shut": (EYE_SHUT, EYE_SHUT), "happy": (EYE_HAPPY, EYE_HAPPY)}[eyes]
-    stamp(c, ix - 8, iy - 2, el, EYEMAP, "detail", part)
-    stamp(c, ix + 5, iy - 2, er, EYEMAP, "detail", part)
-    if blush:
-        for bx in (ix - 10, ix - 9, ix + 10, ix + 11):
-            c.put(bx, iy + 4, BLUSH, "detail", part)
-    # nose + mouth (ω)
-    c.put(ix, iy + 4, NOSE, "detail", part)
-    c.put(ix + 1, iy + 4, NOSE, "detail", part)
-    if mouth == "w":
-        for (x, y) in ((ix - 2, iy + 5), (ix, iy + 5), (ix + 1, iy + 5), (ix + 3, iy + 5),
-                       (ix - 1, iy + 6), (ix + 2, iy + 6)):
-            c.put(x, y, MOUTH, "detail", part)
-    elif mouth == "open":  # chewing / meow
-        for (x, y) in ((ix, iy + 5), (ix + 1, iy + 5), (ix - 1, iy + 6), (ix + 2, iy + 6)):
-            c.put(x, y, MOUTH, "detail", part)
-        c.put(ix, iy + 6, PINK_D, "detail", part)
-        c.put(ix + 1, iy + 6, PINK_D, "detail", part)
-        c.put(ix, iy + 7, MOUTH, "detail", part)
-        c.put(ix + 1, iy + 7, MOUTH, "detail", part)
-
-
-def back_head(c, dy=0, dx=0, ear_twitch=0, part="head"):
-    hx, hy = HEAD_F["cx"] + dx, HEAD_F["cy"] + dy
-    for side in (-1, 1):
-        tw = ear_twitch if side > 0 else 0
-        tip = (hx + side * (10.0 + tw), hy - 15.0 + abs(tw))
-        pts = [(hx + side * 3.5, hy - 9.5), tip, (hx + side * 14.0, hy - 4.0)]
-        poly(c, pts, lambda x, y, t=tip: FUR[1] if y < t[1] + 4 else FUR[2], "fur", part + "_ear")
-        # back of ear: a soft darker rim on the inner edge, pink peeking at the base
-        ix = int(round(tip[0]))
-        for j in range(2, 7):
-            xx = ix - side * (j // 2)
-            c.put(xx, int(round(tip[1])) + j, FUR[2], "fur", part + "_ear")
-        c.put(int(round(hx + side * 6)), int(round(hy - 9)), PINK_D, "detail", part + "_ear")
-    ellipse(c, hx, hy, HEAD_F["rx"], HEAD_F["ry"], FUR, "fur", part, bias=0.04)
-    ellipse(c, hx, hy + 4.0, HEAD_F["rx"] + 0.6, 6.0, FUR, "fur", part,
-            clip=lambda x, y: y >= hy + 3)
-    ix, iy = int(math.floor(hx)), int(round(hy))
-    # back-of-head tabby stripes running to the nape
-    stamp(c, ix - 1, iy - 10, ["ss", "ss", "Ss", "Ss", ".S", ".S"], EYEMAP, "fur", part)
-    stamp(c, ix + 1, iy - 10, ["ss", "ss", "sS", "sS", "S.", "S."], EYEMAP, "fur", part)
-    stamp(c, ix - 6, iy - 8, ["s.", "s.", "Ss", ".S"], EYEMAP, "fur", part)
-    stamp(c, ix + 6, iy - 8, [".s", ".s", "sS", "S."], EYEMAP, "fur", part)
-    stamp(c, ix - 11, iy - 2, ["ss", ".S"], EYEMAP, "fur", part)
-    stamp(c, ix + 11, iy - 2, ["ss", "S."], EYEMAP, "fur", part)
-
-
 # ---------------------------------------------------------------------------
 # Tail (front/back/side) — chain of circles along a curve, ringed stripes
 # ---------------------------------------------------------------------------
@@ -514,312 +352,494 @@ def tail(c, pts, r0=2.6, r1=1.9, ramp=FUR, part="tail", rings=True, white_tip=Fa
 
 
 # ---------------------------------------------------------------------------
-# Paws / legs
+# Model-unit helpers: poses are authored on a 64-unit grid (centre 31.5, sole
+# 60) and mapped to the 80px canvas.  Whole-pixel offsets (bob, lift) are
+# given in PIXELS and converted with /K so shapes shift without re-rasterising
+# differently (no 1px jitter).
 # ---------------------------------------------------------------------------
-def paw_front(c, x, foot_y, part, lifted=False, far=False):
+def X(x):
+    return CX + (x - 31.5) * K
+
+
+def Y(y):
+    return SOLE + (y - 60.0) * K
+
+
+def P(px):  # pixels -> model units
+    return px / K
+
+
+def el(c, x, y, rx, ry, ramp, mat, part, bias=0.0, clip=None, only_over=None):
+    ellipse(c, X(x), Y(y), rx * K, ry * K, ramp, mat, part, bias=bias, clip=clip, only_over=only_over)
+
+
+def cap(c, x0, y0, x1, y1, r0, r1, ramp, mat, part, bias=0.0, clip=None):
+    capsule(c, X(x0), Y(y0), X(x1), Y(y1), r0 * K, r1 * K, ramp, mat, part, bias=bias, clip=clip)
+
+
+def pl(c, pts, col_fn, mat, part):
+    poly(c, [(X(a), Y(b)) for a, b in pts], col_fn, mat, part)
+
+
+def tl(c, pts, r0, r1, ramp=FUR, part="tail", white_tip=True):
+    tail(c, [(X(a), Y(b)) for a, b in pts], r0=r0 * K, r1=r1 * K, ramp=ramp, part=part, white_tip=False)
+    if white_tip:
+        # fluffy white pom on the last ~25% of the tail
+        a, b = pts[-1]
+        a2, b2 = pts[-2]
+        tx, ty = X(a + (a2 - a) * 0.15), Y(b + (b2 - b) * 0.15)
+        ellipse(c, tx, ty, r1 * K + 1.3, r1 * K + 1.3, WHT, "white", part, bias=0.15)
+
+
+def sb(c, pts, parts):
+    stripe_band(c, [(X(a), Y(b)) for a, b in pts], parts)
+
+
+def sk(c, part, y_from, ramp=WHT):
+    sock(c, part, Y(y_from), ramp)
+
+
+def ct(c, front, behind, min_y=-99, max_y=999):
+    contour(c, front, behind, min_y=Y(min_y) if min_y > -99 else -1, max_y=Y(max_y) if max_y < 999 else 999)
+
+
+def ix_(x):
+    return int(round(X(x)))
+
+
+def iy_(y):
+    return int(round(Y(y)))
+
+
+def shadows_at(xs, half=3.0):
+    return [(X(x) - half * K, X(x) + half * K) for x in xs]
+
+
+# ---------------------------------------------------------------------------
+# Face stamps (80px canvas — larger, cleaner chibi eyes)
+# ---------------------------------------------------------------------------
+EYEMAP = {"e": EYE_D, "g": EYE, "G": EYE_L, "h": EYE_H, "m": MOUTH, "n": NOSE,
+          "p": PINK, "P": PINK_D, "b": BLUSH, "s": STRIPE, "S": STRIPE_D,
+          "w": WHT[0], "W": WHT[2], "o": OUT}
+EM = dict(EYEMAP)
+BLUSH_L = (252, 192, 188)
+EM.update({"B": BLUSH, "b": BLUSH_L})
+
+EYE_OPEN = [
+    "...eeeeee...",
+    ".eeeeeeeeee.",
+    "eehhheeeeeee",
+    "ehhhheeeeeee",
+    "ehhhheeeeeee",
+    "eehheeeeeeee",
+    "eeeeeggggeee",
+    "eeggggggggee",
+    "egggggggggge",
+    "eggGGGGGhgge",
+    "egGGGGGGGGge",
+    ".eeGGGGGGee.",
+    "...eeeeee...",
+]
+EYE_HALF = ["." * 12] * 5 + [
+    "eeeeeeeeeeee",
+    "eeheeeggggee",
+    "eeggggggggee",
+    "egggggggggge",
+    "eggGGGGGhgge",
+    "egGGGGGGGGge",
+    ".eeGGGGGGee.",
+    "...eeeeee...",
+]
+EYE_SHUT = ["." * 12] * 9 + ["e..........e", ".ee......ee.", "...eeeeee...", "." * 12]
+EYE_HAPPY = ["." * 12] * 5 + ["...eeeeee...", ".ee......ee.", "e..........e"] + ["." * 12] * 5
+SIDE_EYE = {
+    "open": [".eeeeee.", "eehhheee", "ehhhheee", "ehhheeee", "eeheeeee", "eeggggee", "eggggghe", "egGGGgge", ".eGGGGe.", "..eeee.."],
+    "half": ["........"] * 4 + ["eeeeeeee", "eheggeee", "eggggghe", "egGGGgge", ".eGGGGe.", "..eeee.."],
+    "shut": ["........"] * 7 + ["e......e", ".eeeeee.", "........"],
+    "happy": ["........"] * 4 + [".eeeeee.", "e......e"] + ["........"] * 4,
+}
+
+# Model sheet (style C), model units
+HEAD = dict(cy=30.0, rx=17.8, ry=14.8)      # front / back head
+BODY = dict(cy=51.0, rx=8.6, ry=5.8)        # standing torso (front)
+LEG_X, HIP_X = 3.6, 7.0
+SHEAD = dict(cx=39.5, cy=31.5, rx=14.4, ry=13.2)
+SBODY = dict(cx=27.0, cy=49.0, rx=11.0, ry=6.4)
+
+
+# ---------------------------------------------------------------------------
+# FRONT head
+# ---------------------------------------------------------------------------
+def _ear_front(c, hx, hy, side, part, flat=False):
+    rx, ry = HEAD["rx"], HEAD["ry"]
+    if flat:   # relaxed, leaning out to the sides
+        tip = (hx + side * rx * 0.86, hy - ry - 0.6)
+        base_o = (hx + side * (rx + 0.6), hy - ry * 0.20)
+        base_i = (hx + side * rx * 0.30, hy - ry * 0.80)
+    else:
+        tip = (hx + side * rx * 0.68, hy - ry - 3.6)
+        base_o = (hx + side * rx * 0.99, hy - ry * 0.30)
+        base_i = (hx + side * rx * 0.24, hy - ry * 0.84)
+    cyc = Y(tip[1] + 2.6)
+    tipy = Y(tip[1])
+    pl(c, [base_i, tip, base_o], lambda x, y: (FUR[1] if y < tipy + 7 else FUR[2]) if y >= cyc else None, "fur", part)
+    el(c, tip[0] - side * 0.3, tip[1] + 2.6, 2.6, 2.6, FUR, "fur", part, bias=0.1)
+    # inner ear
+    tx, ty = ix_(tip[0] - side * 0.3), iy_(tip[1] + 1.4)
+    rows = ["pp", "ppp", "Pppp", "Pppp", "PPp"]
+    for j, row in enumerate(rows):
+        n = len(row)
+        for i, ch in enumerate(row):
+            if side < 0:
+                xx = tx - 1 + i
+            else:
+                xx = tx + 1 - i
+            c.put(xx, ty + j, EM[ch], "detail", part)
+
+
+def front_head(c, dy=0.0, dx=0.0, eyes="open", ears="up", mouth="w", part="head"):
+    hx, hy = 31.5 + dx, HEAD["cy"] + dy
+    rx, ry = HEAD["rx"], HEAD["ry"]
+    for side in (-1, 1):
+        _ear_front(c, hx, hy, side, part + "_ear", flat=(ears == "flat"))
+    yclip = Y(hy + ry * 0.3)
+    el(c, hx, hy + ry * 0.35, rx + 0.6, ry * 0.55, FUR, "fur", part, clip=lambda x, y: y >= yclip, bias=0.06)
+    el(c, hx, hy, rx, ry, FUR, "fur", part, bias=0.14)
+    el(c, hx, hy + ry * 0.60, 4.4, 3.0, WHT, "white", part, bias=0.3)
+    ix, iy = int(math.floor(X(hx))), iy_(hy)
+    top = iy_(hy - ry) + 2
+    # tabby M (2px strokes)
+    stamp(c, ix, top, ["ss", "ss", "ss", "SS"], EM, "fur", part)
+    stamp(c, ix - 4, top + 1, ["s", "s", "s", "S"], EM, "fur", part)
+    stamp(c, ix + 5, top + 1, ["s", "s", "s", "S"], EM, "fur", part)
+    stamp(c, ix - 8, top + 3, ["s", "s", "S"], EM, "fur", part)
+    stamp(c, ix + 9, top + 3, ["s", "s", "S"], EM, "fur", part)
+    # cheek stripes
+    off = int(round(rx * K)) - 1
+    stamp(c, ix - off, iy + 2, ["sss.", ".SSS"], EM, "fur", part, only_on=(part,))
+    stamp(c, ix + off - 2, iy + 2, [".sss", "SSS."], EM, "fur", part, only_on=(part,))
+    stamp(c, ix - off + 1, iy + 5, ["ss.", ".SS"], EM, "fur", part, only_on=(part,))
+    stamp(c, ix + off - 2, iy + 5, [".ss", "SS."], EM, "fur", part, only_on=(part,))
+    st = {"open": EYE_OPEN, "half": EYE_HALF, "shut": EYE_SHUT, "happy": EYE_HAPPY}[eyes]
+    w, h = len(st[0]), len(st)
+    ex = int(round(rx * 0.45 * K))
+    ey = iy - h // 2 + 3
+    stamp(c, ix - ex - w // 2 + 1, ey, st, EM, "detail", part)
+    stamp(c, ix + ex - w // 2 + 1, ey, st, EM, "detail", part)
+    by = ey + h - 1
+    for sx in (ix - ex - w // 2 - 2, ix + ex + w // 2 - 2):
+        stamp(c, sx, by, ["bBBBBb", ".bbbb."], EM, "detail", part, only_on=(part,))
+    ny = iy_(hy + ry * 0.60) - 2
+    c.put(ix, ny, NOSE, "detail", part)
+    c.put(ix + 1, ny, NOSE, "detail", part)
+    c.put(ix, ny + 1, PINK_D, "detail", part)
+    c.put(ix + 1, ny + 1, PINK_D, "detail", part)
+    if mouth == "w":
+        for (x, y) in ((ix - 2, ny + 2), (ix + 3, ny + 2), (ix - 1, ny + 3), (ix + 2, ny + 3), (ix, ny + 2), (ix + 1, ny + 2)):
+            c.put(x, y, MOUTH, "detail", part)
+    else:  # open (meow / chew)
+        for (x, y) in ((ix - 1, ny + 2), (ix + 2, ny + 2), (ix - 1, ny + 3), (ix + 2, ny + 3), (ix, ny + 4), (ix + 1, ny + 4)):
+            c.put(x, y, MOUTH, "detail", part)
+        for (x, y) in ((ix, ny + 2), (ix + 1, ny + 2), (ix, ny + 3), (ix + 1, ny + 3)):
+            c.put(x, y, PINK_D, "detail", part)
+
+
+def back_head(c, dy=0.0, dx=0.0, ear_twitch=0, part="head"):
+    hx, hy = 31.5 + dx, HEAD["cy"] + dy
+    rx, ry = HEAD["rx"], HEAD["ry"]
+    for side in (-1, 1):
+        tw = ear_twitch if side > 0 else 0
+        tip = (hx + side * (rx * 0.68 + tw), hy - ry - 3.6 + abs(tw))
+        base_o = (hx + side * rx * 0.99, hy - ry * 0.30)
+        base_i = (hx + side * rx * 0.24, hy - ry * 0.84)
+        cyc, tipy = Y(tip[1] + 2.6), Y(tip[1])
+        pl(c, [base_i, tip, base_o], lambda x, y, cyc=cyc, tipy=tipy: (FUR[1] if y < tipy + 6 else FUR[2]) if y >= cyc else None,
+           "fur", part + "_ear")
+        el(c, tip[0] - side * 0.3, tip[1] + 2.6, 2.6, 2.6, FUR, "fur", part + "_ear", bias=0.1)
+        # back of the ear: darker rim on the inner edge + a peek of pink at the base
+        tx, ty = ix_(tip[0]), iy_(tip[1] + 1.0)
+        for j in range(1, 8):
+            c.put(tx - side * (1 + j // 2), ty + j, FUR[2], "fur", part + "_ear")
+        c.put(ix_(hx + side * rx * 0.36), iy_(hy - ry * 0.80), PINK_D, "detail", part + "_ear")
+    yclip = Y(hy + ry * 0.3)
+    el(c, hx, hy + ry * 0.35, rx + 0.6, ry * 0.55, FUR, "fur", part, clip=lambda x, y: y >= yclip, bias=0.06)
+    el(c, hx, hy, rx, ry, FUR, "fur", part, bias=0.24)
+    ix, iy = int(math.floor(X(hx))), iy_(hy)
+    top = iy_(hy - ry) + 2
+    # bold tabby stripes converging toward the nape (reads clearly from behind)
+    stamp(c, ix, top, ["ss", "ss", "ss", "SS", "SS", "SS", ".S"], EM, "fur", part)
+    for side in (-1, 1):
+        for k, (ox, oy, ln) in enumerate(((5, 1, 6), (10, 3, 5), (15, 7, 4))):
+            x0 = ix + (side * ox if side < 0 else side * ox + 1)
+            for j in range(ln):
+                xx = x0 - side * (j // 3)
+                k2 = (xx, top + oy + j)
+                if c.part.get(k2) == part and c.mat.get(k2) == "fur":
+                    c.px[k2] = STRIPE if j < ln - 1 else STRIPE_D
+    # nape fluff: lighter cheeks visible at the sides
+    for side in (-1, 1):
+        stamp(c, ix + side * (int(rx * K) - 2) - (2 if side > 0 else 0), iy + 3, ["sss", ".SS"] if side < 0 else ["sss", "SS."],
+              EM, "fur", part, only_on=(part,))
+
+
+# ---------------------------------------------------------------------------
+# Legs / paws
+# ---------------------------------------------------------------------------
+def paw(c, x, foot_px, part, lifted=False, far=False):
+    """x in model units, foot_px = pixel row of the paw bottom."""
     ramp = WHT_FAR if far else WHT
-    ellipse(c, x, foot_y - 1.0, 3.3, 1.9, ramp, "white", part, bias=0.2)
+    ellipse(c, X(x), foot_px - 1.4, 3.4 * K, 1.9 * K, ramp, "white", part, bias=0.2)
+    xi = int(math.floor(X(x)))
     if not lifted:
-        # toe gaps on the planted paw
-        c.put(int(math.floor(x)) - 1, foot_y, ramp[2], "white", part)
-        c.put(int(math.floor(x)) + 2, foot_y, ramp[2], "white", part)
+        c.put(xi - 1, foot_px, ramp[2], "white", part)
+        c.put(xi + 2, foot_px, ramp[2], "white", part)
     else:
-        xi = int(math.floor(x))
         for xx in (xi, xi + 1):
-            c.put(xx, foot_y, PINK_D, "detail", part)
-        c.put(xi - 1, foot_y, PINK, "detail", part)
-        c.put(xi + 2, foot_y, PINK, "detail", part)
+            c.put(xx, foot_px, PINK_D, "detail", part)
+        c.put(xi - 1, foot_px, PINK, "detail", part)
+        c.put(xi + 2, foot_px, PINK, "detail", part)
+        c.put(xi - 2, foot_px - 1, PINK, "detail", part)
+        c.put(xi + 3, foot_px - 1, PINK, "detail", part)
 
 
-def foreleg_front(c, x, top_y, lift, part, far=False):
-    """Straight leg from inside the chest to the paw; lifted = shorter, bent."""
-    foot = SOLE - lift
+def leg_front(c, x, top_y, lift_px, part, far=False, r=3.0):
+    foot = SOLE - lift_px
     ramp = FUR_FAR if far else FUR
-    if lift > 0:
-        kx = x + (0.8 if x > CX else -0.8)
-        capsule(c, x, top_y, kx, foot - 4, 3.0, 2.7, ramp, "fur", part)
-        capsule(c, kx, foot - 4, x, foot - 2, 2.7, 2.6, ramp, "fur", part)
-    else:
-        capsule(c, x, top_y, x, foot - 2, 3.0, 2.6, ramp, "fur", part)
-    sock(c, part, foot - 3, WHT_FAR if far else WHT)
-    paw_front(c, x, foot, part, lifted=lift > 0, far=far)
-
-
-def hindleg_front(c, x, lift, part, far=False):
-    """Haunch + short shin peeking beside the chest (front view)."""
-    foot = SOLE - lift
-    ramp = FUR_FAR if far else FUR
-    hip_y = 47.5
-    ellipse(c, x, hip_y, 4.6, 6.2, ramp, "fur", part, bias=-0.05)
-    capsule(c, x + (0.6 if x > CX else -0.6), hip_y + 3, x, foot - 2, 2.8, 2.5, ramp, "fur", part)
-    sock(c, part, foot - 3, WHT_FAR if far else WHT)
-    paw_front(c, x, foot, part, lifted=lift > 0, far=far)
+    fy = (foot - SOLE) / K + 60.0  # model units
+    cap(c, x, top_y, x, fy - 2.0, r, r - 0.3, ramp, "fur", part)
+    sock(c, part, foot - 4, WHT_FAR if far else WHT)
+    paw(c, x, foot, part, lifted=lift_px > 0, far=far)
 
 
 # ---------------------------------------------------------------------------
-# FRONT body
+# FRONT / BACK standing
 # ---------------------------------------------------------------------------
-def front_stand(eyes="open", bob=0, legs=None, tail_sway=0.0, breathe=0, ears="up",
-                head_dx=0, mouth="w", blush=True, hide_tail=False):
-    """legs: dict FL/FR/HL/HR -> lift px (0 planted)."""
+def front_stand(eyes="open", bob=0, legs=None, tail_sway=0.0, breathe=0, ears="up", mouth="w",
+                head_dy=0, head_dx=0):
+    """bob/legs in pixels (bob<0 = up).  legs: FL/FR/HL/HR -> lift px."""
     legs = legs or {"FL": 0, "FR": 0, "HL": 0, "HR": 0}
     c = Cv()
-    by = bob
-    # tail behind everything: rises from behind the right hip and curls up
-    if not hide_tail:
-        sw = tail_sway
-        tail(c, [(40, 46 + by), (47 + sw * 0.4, 42 + by), (50 + sw, 34 + by), (48 + sw * 1.4, 27 + by)])
-    # hind haunches (behind chest)
-    hindleg_front(c, CX - 9.5, legs["HL"], "hl", far=True)
-    hindleg_front(c, CX + 9.5, legs["HR"], "hr", far=True)
-    # torso / chest
-    ellipse(c, CX, 42.5 + by, 10.0, 9.0 + breathe * 0.3, FUR, "fur", "body", bias=0.0)
-    # white bib
-    ellipse(c, CX, 43.0 + by, 5.6, 9.0 + breathe * 0.3, WHT, "white", "body", bias=0.2,
-            clip=lambda x, y: (x, y) in c.px and c.part.get((x, y)) == "body")
-    # side stripes on the torso
-    stamp(c, int(CX) - 9, 40 + by, ["s.", "ss", ".S"], EYEMAP, "fur", "body", only_on=("body",))
-    stamp(c, int(CX) + 9, 40 + by, [".s", "ss", "S."], EYEMAP, "fur", "body", only_on=("body",))
-    # forelegs
-    foreleg_front(c, CX - 4.5, 44 + by, legs["FL"], "fl")
-    foreleg_front(c, CX + 4.5, 44 + by, legs["FR"], "fr")
-    contour(c, ("fl", "fr"), ("body", "hl", "hr"), min_y=48 + by)
-    contour(c, ("body",), ("hl", "hr"), min_y=44 + by)
-    contour(c, ("fl",), ("fr",), min_y=46)
-    contour(c, ("fr",), ("fl",), min_y=46)
-    # head on top
-    front_head(c, dy=by, eyes=eyes, ears=ears, dx=head_dx, mouth=mouth, blush=blush)
-    contour(c, ("head",), ("body",), min_y=30 + by)
-    shadows = []
-    for k, x in (("HL", CX - 9.5), ("FL", CX - 4.5), ("FR", CX + 4.5), ("HR", CX + 9.5)):
-        if legs[k] == 0:
-            shadows.append((x - 3, x + 3))
-    return finish(c, shadows)
+    b = P(bob)
+    bcy = BODY["cy"] + b
+    sw = tail_sway
+    t0 = 31.5 + BODY["rx"] * 0.7
+    tl(c, [(t0, bcy + 2), (t0 + 6, bcy), (t0 + 10 + sw * 0.5, bcy - 5), (t0 + 10 + sw, bcy - 11)], 3.2, 2.7)
+    for side, k, part in ((-1, "HL", "hl"), (1, "HR", "hr")):
+        x = 31.5 + side * HIP_X
+        el(c, x, bcy + 2.5, 4.4, 5.0, FUR_FAR, "fur", part, bias=-0.05)
+        leg_front(c, x, bcy + 3, legs[k], part, far=True, r=2.9)
+    el(c, 31.5, bcy, BODY["rx"], BODY["ry"] + breathe * P(1) * 0.5, FUR, "fur", "body")
+    el(c, 31.5, bcy + 0.5, BODY["rx"] * 0.55, BODY["ry"], WHT, "white", "body", bias=0.2,
+       clip=lambda x, y: c.part.get((x, y)) == "body")
+    stamp(c, ix_(31.5 - BODY["rx"]) + 1, iy_(bcy) - 2, ["s.", "ss", ".S"], EM, "fur", "body", only_on=("body",))
+    stamp(c, ix_(31.5 + BODY["rx"]) - 2, iy_(bcy) - 2, [".s", "ss", "S."], EM, "fur", "body", only_on=("body",))
+    for side, k, part in ((-1, "FL", "fl"), (1, "FR", "fr")):
+        leg_front(c, 31.5 + side * LEG_X, bcy + 1, legs[k], part)
+    ct(c, ("fl", "fr"), ("body", "hl", "hr"), min_y=bcy + 3)
+    ct(c, ("body",), ("hl", "hr"), min_y=bcy)
+    ct(c, ("fl",), ("fr",), min_y=bcy + 3)
+    ct(c, ("fr",), ("fl",), min_y=bcy + 3)
+    front_head(c, dy=b + P(head_dy), dx=P(head_dx), eyes=eyes, ears=ears, mouth=mouth)
+    ct(c, ("head",), ("body",), min_y=HEAD["cy"])
+    xs = [31.5 + s * d for s, d, k in ((-1, HIP_X, "HL"), (1, HIP_X, "HR"), (-1, LEG_X, "FL"), (1, LEG_X, "FR")) if legs[k] == 0]
+    return finish(c, shadows_at(xs))
 
 
 def back_stand(bob=0, legs=None, tail_sway=0.0, breathe=0, ear_twitch=0):
     legs = legs or {"FL": 0, "FR": 0, "HL": 0, "HR": 0}
     c = Cv()
-    by = bob
-    # far forelegs peek beside the rump (behind)
-    hindleg_front(c, CX - 9.0, legs["FL"], "ffl", far=True)
-    hindleg_front(c, CX + 9.0, legs["FR"], "ffr", far=True)
-    # back / rump: wider, rounder than the chest
-    ellipse(c, CX, 43.0 + by, 11.0, 9.0 + breathe * 0.3, FUR, "fur", "body", bias=0.0)
-    # spine stripe + side stripes
-    for yy in range(35 + by, 45 + by):
-        for xx in (31, 32):
-            k = (xx, yy)
-            if c.part.get(k) == "body":
-                c.px[k] = STRIPE if c.px[k] in (FUR[0], FUR[1]) else STRIPE_D
-    for sy, w in ((40, 3),):
-        stripe_band(c, [(CX - 3.5 - w, sy + by + 1), (CX - 3.5, sy + by)], ("body",))
-        stripe_band(c, [(CX + 3.5, sy + by), (CX + 3.5 + w, sy + by + 1)], ("body",))
-    # near hind legs (closest to camera in back view)
-    for side, k in ((-1, "HL"), (1, "HR")):
-        x = CX + side * 4.8
-        lift = legs[k]
-        foot = SOLE - lift
-        capsule(c, x, 47 + by, x - side * 0.4, foot - 2, 3.1, 2.7, FUR, "fur", "n" + k.lower(),
-                clip=lambda xx, yy, by=by: yy >= 50 + by or (xx, yy) not in c.px)
-        sock(c, "n" + k.lower(), foot - 3)
-        paw_front(c, x, foot, "n" + k.lower(), lifted=lift > 0)
-    contour(c, ("nhl", "nhr"), ("ffl", "ffr"), min_y=53)
-    contour(c, ("nhl",), ("nhr",), min_y=53)
-    contour(c, ("nhr",), ("nhl",), min_y=53)
-    back_head(c, dy=by, ear_twitch=ear_twitch)
-    contour(c, ("head",), ("body",), min_y=30 + by)
-    # tail is nearest the camera: rises from the rump and curls up to the right
+    b = P(bob)
+    bcy = BODY["cy"] + b
+    # far forelegs peek out wider than the rump
+    for side, k, part in ((-1, "FL", "ffl"), (1, "FR", "ffr")):
+        leg_front(c, 31.5 + side * HIP_X, bcy + 1, legs[k], part, far=True, r=2.8)
+    el(c, 31.5, bcy + 0.5, BODY["rx"] + 0.8, BODY["ry"] + 0.6 + breathe * P(1) * 0.5, FUR, "fur", "body")
+    # spine stripe + side bands
+    for yy in range(iy_(bcy - BODY["ry"]), iy_(bcy + 2)):
+        for xx in (int(CX), int(CX) + 1):
+            if c.part.get((xx, yy)) == "body":
+                c.px[(xx, yy)] = STRIPE if c.px[(xx, yy)] in (FUR[0], FUR[1]) else STRIPE_D
+    sb(c, [(31.5 - 7.5, bcy - 1.5), (31.5 - 3.5, bcy - 2.5)], ("body",))
+    sb(c, [(31.5 + 3.5, bcy - 2.5), (31.5 + 7.5, bcy - 1.5)], ("body",))
+    sb(c, [(31.5 - 8, bcy + 1.5), (31.5 - 4.5, bcy + 0.5)], ("body",))
+    sb(c, [(31.5 + 4.5, bcy + 0.5), (31.5 + 8, bcy + 1.5)], ("body",))
+    for side, k, part in ((-1, "HL", "nhl"), (1, "HR", "nhr")):
+        x = 31.5 + side * LEG_X
+        leg_front(c, x, bcy + 3, legs[k], part, r=3.0)
+    ct(c, ("nhl", "nhr"), ("ffl", "ffr", "body"), min_y=bcy + 3)
+    ct(c, ("nhl",), ("nhr",), min_y=bcy + 3)
+    ct(c, ("nhr",), ("nhl",), min_y=bcy + 3)
+    back_head(c, dy=b, ear_twitch=ear_twitch)
+    ct(c, ("head",), ("body",), min_y=HEAD["cy"])
     sw = tail_sway
-    tail(c, [(32, 50 + by), (39, 50 + by), (45 + sw * 0.3, 47 + by), (48 + sw * 0.7, 41 + by), (48 + sw, 35 + by)],
-         r0=2.7, r1=2.0)
-    contour(c, ("tail",), ("head", "body", "nhr", "nhl", "head_ear"), min_y=0)
-    shadows = []
-    for k, x in (("FL", CX - 9.0), ("HL", CX - 4.8), ("HR", CX + 4.8), ("FR", CX + 9.0)):
-        if legs[k] == 0:
-            shadows.append((x - 3, x + 3))
-    return finish(c, shadows)
+    # tail is nearest the camera: from the rump, curling up to the right, white pom
+    tl(c, [(31.5, bcy + 2), (37, bcy + 3), (42 + sw * 0.3, bcy + 1), (45 + sw * 0.7, bcy - 3), (45 + sw, bcy - 8)], 3.0, 2.6)
+    ct(c, ("tail",), ("head", "body", "nhr", "nhl", "ffr", "head_ear"))
+    xs = [31.5 + s * d for s, d, k in ((-1, HIP_X, "FL"), (1, HIP_X, "FR"), (-1, LEG_X, "HL"), (1, LEG_X, "HR")) if legs[k] == 0]
+    return finish(c, shadows_at(xs))
 
 
 # ---------------------------------------------------------------------------
-# SIDE model sheet (facing right; left = flip_h in game)
+# SIDE (facing right; left = flip in game)
 # ---------------------------------------------------------------------------
-HEAD_S = dict(cx=44.0, cy=26.5, rx=10.6, ry=9.6)
-BODY_S = dict(cx=29.0, cy=41.0, rx=15.0, ry=8.0)
-
-
-def side_head(c, dx=0, dy=0, eyes="open", ears="up", mouth="closed", part="head"):
-    hx, hy = HEAD_S["cx"] + dx, HEAD_S["cy"] + dy
-    # far ear (behind, darker), near ear
-    far_tip = (hx + 5.5, hy - 13.0) if ears == "up" else (hx + 1.5, hy - 11.0)
-    poly(c, [(hx + 1.0, hy - 7.0), far_tip, (hx + 8.5, hy - 5.5)],
-         lambda x, y: FUR_FAR[2], "fur", part + "_far_ear")
-    near_tip = (hx - 2.5, hy - 14.0) if ears == "up" else (hx - 6.5, hy - 11.0)
-    poly(c, [(hx - 8.0, hy - 5.0), near_tip, (hx + 2.5, hy - 7.5)],
-         lambda x, y, t=near_tip: FUR[1] if y < t[1] + 5 else FUR[2], "fur", part + "_ear")
-    ellipse(c, hx, hy, HEAD_S["rx"], HEAD_S["ry"], FUR, "fur", part, bias=0.04)
-    # cheek fluff toward the back-bottom
-    ellipse(c, hx - 2.0, hy + 3.5, 9.0, 5.8, FUR, "fur", part, clip=lambda x, y: y >= hy + 2)
-    # snout / muzzle bump forward
-    ellipse(c, hx + 8.2, hy + 3.2, 4.4, 3.6, WHT, "white", part, bias=0.25)
-    ellipse(c, hx + 4.5, hy + 5.5, 4.8, 3.0, WHT, "white", part, bias=0.2,
-            clip=lambda x, y: y >= hy + 4)
-    ix, iy = int(round(hx)), int(round(hy))
-    # inner ear pink on near ear
-    nt = (int(round(near_tip[0])), int(round(near_tip[1])))
-    for j, row in enumerate(["p", "pp", "pP", "ppP"]):
+def side_head(c, dx=0.0, dy=0.0, eyes="open", ears="up", mouth="closed", part="head"):
+    hx, hy, rx, ry = SHEAD["cx"] + dx, SHEAD["cy"] + dy, SHEAD["rx"], SHEAD["ry"]
+    kx, ky = rx / 10.6, ry / 9.6
+    flat = ears == "flat"
+    ft = (hx + (5.0 if not flat else 2.0) * kx, hy - (12.4 if not flat else 10.6) * ky)
+    ycut = Y(ft[1] + 2)
+    pl(c, [(hx + 1.0 * kx, hy - 7.0 * ky), ft, (hx + 8.5 * kx, hy - 5.5 * ky)],
+       lambda x, y: FUR_FAR[1] if y >= ycut else None, "fur", part + "_far_ear")
+    el(c, ft[0], ft[1] + 2.4, 2.3, 2.3, FUR_FAR, "fur", part + "_far_ear", bias=-0.2)
+    nt = (hx - (2.8 if not flat else 6.0) * kx, hy - (13.4 if not flat else 11.2) * ky)
+    ycut2, nty = Y(nt[1] + 2.4), Y(nt[1])
+    pl(c, [(hx - 8.0 * kx, hy - 5.0 * ky), nt, (hx + 2.5 * kx, hy - 7.5 * ky)],
+       lambda x, y: (FUR[1] if y < nty + 6 else FUR[2]) if y >= ycut2 else None, "fur", part + "_ear")
+    el(c, nt[0], nt[1] + 2.6, 2.6, 2.6, FUR, "fur", part + "_ear", bias=0.1)
+    yc = Y(hy + 2 * ky)
+    el(c, hx - 2.0 * kx, hy + 3.5 * ky, 9.0 * kx, 5.8 * ky, FUR, "fur", part, clip=lambda x, y: y >= yc, bias=0.06)
+    el(c, hx, hy, rx, ry, FUR, "fur", part, bias=0.14)
+    # snout projects past the round skull (a profile, never an owl face)
+    mx = hx + rx * 0.80
+    el(c, mx, hy + 2.8 * ky, 3.3, 2.9, FUR, "fur", part, bias=0.1)
+    yc2 = Y(hy + 3.4 * ky)
+    el(c, mx - 0.6, hy + 4.6 * ky, 3.3, 2.2, WHT, "white", part, bias=0.25,
+       clip=lambda x, y: y >= yc2 and c.part.get((x, y)) == part)
+    yc3 = Y(hy + 5.2 * ky)
+    el(c, hx + 6.0 * kx, hy + 6.2 * ky, 3.4 * kx, 2.4 * ky, WHT, "white", part, bias=0.2,
+       clip=lambda x, y: y >= yc3 and c.part.get((x, y)) == part)
+    # inner ear (near)
+    tx, ty = ix_(nt[0]), iy_(nt[1] + 1.4)
+    for j, row in enumerate(["pp", "ppP", "ppPP", "pPP"]):
         for i, ch in enumerate(row):
-            c.put(nt[0] + i, nt[1] + 3 + j, EYEMAP[ch], "detail", part + "_ear")
-    # stripes on head: forehead + cheek
-    stamp(c, ix - 3, iy - 9, ["s.s.s", "s.s.S", "S.S.."], EYEMAP, "fur", part, only_on=(part,))
-    stamp(c, ix - 9, iy + 1, ["ss.", ".SS"], EYEMAP, "fur", part, only_on=(part,))
-    # eye
-    stamp(c, ix + 3, iy - 3, SIDE_EYE[eyes], EYEMAP, "detail", part)
-    # blush
-    c.put(ix + 2, iy + 3, BLUSH, "detail", part)
-    c.put(ix + 3, iy + 3, BLUSH, "detail", part)
-    # nose at snout tip + mouth
-    c.put(ix + 12, iy + 1, NOSE, "detail", part)
-    c.put(ix + 12, iy + 2, NOSE, "detail", part)
+            c.put(tx - 1 + i, ty + j, EM[ch], "detail", part + "_ear")
+    ix, iy = ix_(hx), iy_(hy)
+    top = iy_(hy - ry) + 2
+    stamp(c, ix - 4, top, ["s.s.s", "s.s.s", "S.S.S", "..S.."], EM, "fur", part, only_on=(part,))
+    stamp(c, ix - int(round(9 * kx * K)), iy + 1, ["sss.", ".SSS"], EM, "fur", part, only_on=(part,))
+    stamp(c, ix - int(round(8 * kx * K)), iy + 4, ["ss.", ".SS"], EM, "fur", part, only_on=(part,))
+    st = SIDE_EYE[eyes]
+    ex = ix_(hx + rx * 0.30) - 1
+    ey = iy - 7
+    stamp(c, ex, ey, st, EM, "detail", part)
+    stamp(c, ex - 1, ey + len(st), ["bBBBb", ".bbb."], EM, "detail", part, only_on=(part,))
+    ny = iy_(hy + 2.4 * ky)
+    nx = max(x for (x, y), pp in c.part.items() if y == ny and pp == part)
+    c.put(nx, ny, NOSE, "detail", part)
+    c.put(nx - 1, ny, NOSE, "detail", part)
+    c.put(nx, ny + 1, PINK_D, "detail", part)
+    my = ny + 3
+    mxp = max(x for (x, y), pp in c.part.items() if y == my and pp == part)
     if mouth == "closed":
-        c.put(ix + 11, iy + 4, MOUTH, "detail", part)
-        c.put(ix + 10, iy + 5, MOUTH, "detail", part)
-    else:  # open / chew
-        c.put(ix + 11, iy + 4, MOUTH, "detail", part)
-        c.put(ix + 10, iy + 5, PINK_D, "detail", part)
-        c.put(ix + 11, iy + 5, PINK_D, "detail", part)
-        c.put(ix + 9, iy + 5, MOUTH, "detail", part)
+        c.put(mxp - 1, my, MOUTH, "detail", part)
+        c.put(mxp - 2, my, MOUTH, "detail", part)
+        c.put(mxp - 3, my - 1, MOUTH, "detail", part)
+    else:
+        c.put(mxp - 1, my, MOUTH, "detail", part)
+        c.put(mxp - 2, my, PINK_D, "detail", part)
+        c.put(mxp - 1, my + 1, PINK_D, "detail", part)
+        c.put(mxp - 3, my, MOUTH, "detail", part)
+        c.put(mxp - 2, my + 1, MOUTH, "detail", part)
 
 
-def side_fore(c, hip_x, hip_y, foot_x, lift, part, far=False):
+def side_leg(c, hip_x, hip_y, foot_x, lift_px, part, far=False, haunch=None):
     ramp = FUR_FAR if far else FUR
-    foot = SOLE - lift
-    if lift > 0:
-        # bent wrist: shoulder -> elbow -> paw tucked slightly back
-        ex, ey = (hip_x + foot_x) / 2 + 1.5, (hip_y + foot) / 2
-        capsule(c, hip_x, hip_y, ex, ey, 3.2, 2.7, ramp, "fur", part)
-        capsule(c, ex, ey, foot_x, foot - 2, 2.7, 2.5, ramp, "fur", part)
-    else:
-        capsule(c, hip_x, hip_y, foot_x, foot - 2, 3.2, 2.5, ramp, "fur", part)
-    sock(c, part, foot - 3, WHT_FAR if far else WHT)
     wr = WHT_FAR if far else WHT
-    ellipse(c, foot_x + 0.8, foot - 1.0, 3.2, 1.8, wr, "white", part, bias=0.2)
-    if lift > 0:
-        c.put(int(round(foot_x)), foot, PINK_D, "detail", part)
-        c.put(int(round(foot_x)) - 1, foot, PINK, "detail", part)
-        c.put(int(round(foot_x)) + 1, foot, PINK, "detail", part)
+    foot = SOLE - lift_px
+    fy = (foot - SOLE) / K + 60.0
+    if haunch:
+        el(c, hip_x, hip_y, haunch[0], haunch[1], ramp, "fur", part, bias=-0.02)
+    cap(c, hip_x, hip_y, foot_x, fy - 2.0, 3.1, 2.6, ramp, "fur", part)
+    sock(c, part, foot - 4, wr)
+    ellipse(c, X(foot_x + 0.8), foot - 1.4, 3.2 * K, 1.8 * K, wr, "white", part, bias=0.2)
+    fx = ix_(foot_x + 0.8)
+    if lift_px > 0:
+        for xx, col in ((fx - 2, PINK), (fx - 1, PINK_D), (fx, PINK_D), (fx + 1, PINK)):
+            c.put(xx, foot, col, "detail", part)
     else:
-        c.put(int(round(foot_x)) + 2, foot, wr[2], "white", part)
+        c.put(fx + 3, foot, wr[2], "white", part)
 
 
-def side_hind(c, hip_x, hip_y, foot_x, lift, part, far=False):
-    ramp = FUR_FAR if far else FUR
-    foot = SOLE - lift
-    # thigh (big rounded haunch)
-    ellipse(c, hip_x, hip_y, 6.2, 7.2, ramp, "fur", part, bias=-0.02)
-    # hock sits behind the paw — cat hind leg shape
-    hock_x = foot_x - 2.6 - lift * 0.5
-    hock_y = foot - 6 + lift * 0.3
-    capsule(c, hip_x - 1.0, hip_y + 3.0, hock_x, hock_y, 3.4, 2.6, ramp, "fur", part)
-    capsule(c, hock_x, hock_y, foot_x, foot - 2, 2.6, 2.4, ramp, "fur", part)
-    sock(c, part, foot - 3, WHT_FAR if far else WHT)
-    wr = WHT_FAR if far else WHT
-    ellipse(c, foot_x + 0.8, foot - 1.0, 3.2, 1.8, wr, "white", part, bias=0.2)
-    if lift > 0:
-        c.put(int(round(foot_x)), foot, PINK_D, "detail", part)
-        c.put(int(round(foot_x)) - 1, foot, PINK, "detail", part)
-        c.put(int(round(foot_x)) + 1, foot, PINK, "detail", part)
-    else:
-        c.put(int(round(foot_x)) + 2, foot, wr[2], "white", part)
-
-
-def side_stand(eyes="open", bob=0, feet=None, tail_pts=None, breathe=0, head_dy=0, ears="up",
-               mouth="closed", head_dx=0):
-    """feet: dict NF/FF/NH/FH -> (foot_x offset from neutral, lift)."""
+def side_stand(eyes="open", bob=0, feet=None, tail_pts=None, breathe=0, head_dy=0, head_dx=0,
+               ears="up", mouth="closed", lean=0.0):
+    """bob/head_dy in px; feet: NF/FF/NH/FH -> (dx model units, lift px)."""
     feet = feet or {"NF": (0, 0), "FF": (0, 0), "NH": (0, 0), "FH": (0, 0)}
     c = Cv()
-    by = bob
-    bx, byc = BODY_S["cx"], BODY_S["cy"] + by
-    # neutral foot x: fore under shoulder, hind under hip
-    NFX, FFX, NHX, FHX = 38.0, 41.0, 18.5, 21.5
-    tp = tail_pts or [(15, 38 + by), (9, 33 + by), (7, 26 + by), (9, 20 + by)]
-    tail(c, tp, r0=2.7, r1=2.0)
-    # far legs first (darker ramp)
-    side_hind(c, 22.0, 43.0 + by, FHX + feet["FH"][0], feet["FH"][1], "fh", far=True)
-    side_fore(c, 40.0, 41.0 + by, FFX + feet["FF"][0], feet["FF"][1], "ff", far=True)
-    # body
-    ellipse(c, bx, byc, BODY_S["rx"], BODY_S["ry"] + breathe * 0.3, FUR, "fur", "body")
-    # chest is white under the neck
-    ellipse(c, bx + 11.5, byc + 2.0, 4.2, 5.2, WHT, "white", "body", bias=0.15,
-            clip=lambda x, y: c.part.get((x, y)) == "body")
-    # belly lighter underside
-    for k in list(c.px):
-        if c.part.get(k) == "body" and c.mat.get(k) == "fur" and k[1] >= byc + 5 and 22 <= k[0] <= 38:
-            c.px[k] = FUR[2]
-    # back stripes
-    for sx in (20, 25, 30, 35):
-        stripe_band(c, [(sx, byc - 8), (sx - 1, byc - 4), (sx - 1, byc - 1)], ("body",))
-    contour(c, ("body",), ("fh", "ff"), min_y=byc + 2)
-    # near legs
-    side_hind(c, 19.5, 43.5 + by, NHX + feet["NH"][0], feet["NH"][1], "nh")
-    side_fore(c, 37.5, 42.0 + by, NFX + feet["NF"][0], feet["NF"][1], "nf")
-    contour(c, ("nh",), ("body", "fh", "tail"), min_y=byc + 5)
-    contour(c, ("nf",), ("body", "ff"), min_y=byc + 5)
-    side_head(c, dx=head_dx, dy=by + head_dy, eyes=eyes, ears=ears, mouth=mouth)
-    contour(c, ("head",), ("body",), min_y=0)
-    shadows = []
-    for k, x0 in (("NF", NFX), ("FF", FFX), ("NH", NHX), ("FH", FHX)):
+    b = P(bob)
+    bx, by, brx, bry = SBODY["cx"], SBODY["cy"] + b, SBODY["rx"], SBODY["ry"]
+    t0 = bx - brx * 0.85
+    tp = tail_pts or [(t0 + 1, by - 2), (t0 - 4, by - 7), (t0 - 5, by - 14), (t0 - 3, by - 19)]
+    tl(c, tp, 3.2, 2.7)
+    hx0, fx0 = bx - brx * 0.55, bx + brx * 0.55
+    hk = (brx * 0.30, bry * 0.80)
+    side_leg(c, hx0 + 2, by + 1, hx0 + 2.5 + feet["FH"][0], feet["FH"][1], "fh", far=True)
+    side_leg(c, fx0 + 2 + lean, by + 1, fx0 + 2.5 + feet["FF"][0], feet["FF"][1], "ff", far=True)
+    el(c, bx, by, brx, bry + breathe * P(1) * 0.5, FUR, "fur", "body")
+    el(c, bx + brx * 0.72, by + 1.5, 3.8, bry * 0.75, WHT, "white", "body", bias=0.15,
+       clip=lambda x, y: c.part.get((x, y)) == "body")
+    for sx in (-0.5, -0.15, 0.2):
+        x = bx + brx * sx
+        sb(c, [(x, by - bry), (x - 1, by - bry * 0.4), (x - 1, by + 0.5)], ("body",))
+    ct(c, ("body",), ("fh", "ff"), min_y=by + 1)
+    side_leg(c, hx0, by + 1.5, hx0 + feet["NH"][0], feet["NH"][1], "nh", haunch=hk)
+    side_leg(c, fx0 + lean, by + 1.5, fx0 + feet["NF"][0], feet["NF"][1], "nf")
+    ct(c, ("nh",), ("body", "fh", "tail"), min_y=by + 3)
+    ct(c, ("nf",), ("body", "ff"), min_y=by + 3)
+    side_head(c, dx=P(head_dx), dy=b + P(head_dy), eyes=eyes, ears=ears, mouth=mouth)
+    ct(c, ("head",), ("body",))
+    xs = []
+    for k, x0 in (("NF", fx0), ("FF", fx0 + 2.5), ("NH", hx0), ("FH", hx0 + 2.5)):
         if feet[k][1] == 0:
-            fx = x0 + feet[k][0] + 0.8
-            shadows.append((fx - 3, fx + 3))
-    return finish(c, shadows)
+            xs.append(x0 + feet[k][0] + 0.8)
+    return finish(c, shadows_at(xs))
 
 
 # ---------------------------------------------------------------------------
-# Gait
+# Gait — bouncy chibi trot: diagonal pairs, short airborne-free hop in the body
 # ---------------------------------------------------------------------------
 DUTY = 0.625
+BOB = [0, -1, -2, -1, 0, -1, -2, -1]      # px, up = negative (little hop each step)
 
 
-def gait(f, n=8, phase=0.0, amp=4.5, lift_h=3.0):
+def gait(f, n=8, phase=0.0, amp=3.0, lift_h=3):
     t = (f / n + phase) % 1.0
     if t < DUTY:
         s = t / DUTY
         return amp * (1 - 2 * s), 0
-    s = (t - DUTY) / (1 - DUTY) + (1 / 6)
-    s = min(s, 1.0)
-    dx = -amp + 2 * amp * ((t - DUTY) / (1 - DUTY) + 1 / 6)
-    return min(amp, dx), int(round(math.sin(math.pi * min(1.0, s)) * lift_h))
-
-
-BOB = [0, 1, 1, 0, 0, 1, 1, 0]
+    s = (t - DUTY) / (1 - DUTY)
+    dx = -amp + 2 * amp * s
+    return dx, max(1, int(round(math.sin(math.pi * min(1.0, s * 1.15)) * lift_h)))
 
 
 def walk_side(f):
     feet = {}
     for k, ph in (("NF", 0.0), ("FH", 0.0), ("FF", 0.5), ("NH", 0.5)):
-        dx, lift = gait(f, phase=ph, amp=4.5, lift_h=3.0)
-        feet[k] = (round(dx), lift)
+        dx, lift = gait(f, phase=ph, amp=3.0, lift_h=4)
+        feet[k] = (dx, lift)
     by = BOB[f]
-    sw = math.sin((f / 8) * 2 * math.pi - 0.9)
-    tp = [(15, 38 + by), (9, 33 + by + round(sw)), (6 - round(sw), 26 + by), (8 - round(sw * 1.5), 20 + by + round(sw))]
-    return side_stand(bob=by, feet=feet, tail_pts=tp)
+    sw = math.sin((f / 8) * 2 * math.pi - 1.0)
+    bx, byc, brx = SBODY["cx"], SBODY["cy"] + P(by), SBODY["rx"]
+    t0 = bx - brx * 0.85
+    tp = [(t0 + 1, byc - 2), (t0 - 4, byc - 7 + sw * 0.5), (t0 - 5 - sw, byc - 14), (t0 - 3 - sw * 2, byc - 19 + sw * 0.6)]
+    hd = [0, 0, 1, 0, 0, 0, 1, 0][f]   # head lags the body by a pixel at the top of the hop
+    return side_stand(bob=by, feet=feet, tail_pts=tp, head_dy=hd)
 
 
 def walk_front(f, back=False):
     legs = {}
     for k, ph in (("FL", 0.0), ("HR", 0.0), ("FR", 0.5), ("HL", 0.5)):
-        _, lift = gait(f, phase=ph, amp=1, lift_h=3.0)
+        _, lift = gait(f, phase=ph, amp=1, lift_h=4)
         legs[k] = lift
     by = BOB[f]
-    sway = round(math.sin((f / 8) * 2 * math.pi) * 1.5)
+    sway = math.sin((f / 8) * 2 * math.pi) * 2.0
     if back:
         return back_stand(bob=by, legs=legs, tail_sway=sway)
-    return front_stand(bob=by, legs=legs, tail_sway=sway)
+    tilt = [0, 1, 1, 0, 0, -1, -1, 0][f]     # head sways a pixel toward the lifted side
+    return front_stand(bob=by, legs=legs, tail_sway=sway, head_dx=tilt, head_dy=[0, 0, 1, 0, 0, 0, 1, 0][f])
 
 
 # ---------------------------------------------------------------------------
-# Idles (16 frames @ 6 fps): breathe, tail sway, blink / ear twitch
+# Idles (16 frames @ 6 fps)
 # ---------------------------------------------------------------------------
 IDLE_N = 16
 
@@ -828,260 +848,226 @@ def _breath(f):
     return 1 if (f // 4) % 2 == 1 else 0
 
 
+def _blink(f):
+    return {12: "half", 13: "shut", 14: "half"}.get(f, "open")
+
+
 def idle_front(f):
-    eyes = "open"
-    if f == 12:
-        eyes = "half"
-    elif f == 13:
-        eyes = "shut"
-    elif f == 14:
-        eyes = "half"
-    sway = round(math.sin(f / IDLE_N * 2 * math.pi) * 2)
-    return front_stand(eyes=eyes, breathe=_breath(f), tail_sway=sway)
+    sway = math.sin(f / IDLE_N * 2 * math.pi) * 2.5
+    return front_stand(eyes=_blink(f), breathe=_breath(f), tail_sway=sway, head_dy=_breath(f))
 
 
 def idle_back(f):
-    sway = round(math.sin(f / IDLE_N * 2 * math.pi) * 2)
-    tw = 1 if f in (10, 11) else 0
-    return back_stand(breathe=_breath(f), tail_sway=sway, ear_twitch=tw)
+    sway = math.sin(f / IDLE_N * 2 * math.pi) * 2.5
+    return back_stand(breathe=_breath(f), tail_sway=sway, ear_twitch=1 if f in (10, 11) else 0)
 
 
 def idle_side(f):
-    eyes = "open"
-    if f == 12:
-        eyes = "half"
-    elif f == 13:
-        eyes = "shut"
-    elif f == 14:
-        eyes = "half"
     sw = math.sin(f / IDLE_N * 2 * math.pi)
-    tp = [(15, 38), (9, 33 + round(sw)), (6 - round(sw), 26), (8 - round(sw * 2), 20 + round(sw))]
-    return side_stand(eyes=eyes, breathe=_breath(f), tail_pts=tp)
+    bx, by, brx = SBODY["cx"], SBODY["cy"], SBODY["rx"]
+    t0 = bx - brx * 0.85
+    tp = [(t0 + 1, by - 2), (t0 - 4, by - 7 + sw * 0.6), (t0 - 5 - sw * 1.2, by - 14), (t0 - 3 - sw * 2.4, by - 19 + sw)]
+    return side_stand(eyes=_blink(f), breathe=_breath(f), tail_pts=tp, head_dy=_breath(f))
 
 
 # ---------------------------------------------------------------------------
-# Sit loaf (front / side / back)
+# Sits
 # ---------------------------------------------------------------------------
-def sit_front(eyes="open", tail_sway=0, head_dy=0, head_dx=0, mouth="w", ears="up", blush=True,
-              paw_up=0):
+SIT = dict(cy=52.0, rx=10.0, ry=7.4, hdy=2.0)
+
+
+def sit_front(eyes="open", tail_sway=0.0, head_dy=0, head_dx=0, mouth="w", ears="up", paws=(0, 0), paw_out=(0, 0)):
     c = Cv()
-    # tail wraps around the front of the loaf (drawn after body)
-    # haunches
-    ellipse(c, CX - 9.0, 51.0, 6.5, 8.0, FUR, "fur", "hl", bias=-0.05)
-    ellipse(c, CX + 9.0, 51.0, 6.5, 8.0, FUR, "fur", "hr", bias=-0.05)
-    # round sitting body
-    ellipse(c, CX, 47.0, 11.5, 11.0, FUR, "fur", "body")
-    ellipse(c, CX, 46.0, 6.2, 8.5, WHT, "white", "body", bias=0.15,
-            clip=lambda x, y: c.part.get((x, y)) == "body")
-    stamp(c, int(CX) - 11, 44, ["s.", "ss", ".S"], EYEMAP, "fur", "body", only_on=("body",))
-    stamp(c, int(CX) + 11, 44, [".s", "ss", "S."], EYEMAP, "fur", "body", only_on=("body",))
-    contour(c, ("body",), ("hl", "hr"), min_y=46)
-    # hind paws peeking out at the sides
-    for side, part in ((-1, "hpl"), (1, "hpr")):
-        ellipse(c, CX + side * 11.5, SOLE - 1.0, 3.6, 1.9, WHT, "white", part, bias=0.2)
-    # tail curls from the right haunch along the floor in front of the hind paw
+    bcy, brx, bry = SIT["cy"], SIT["rx"], SIT["ry"]
     sw = tail_sway
-    tail(c, [(43, 53), (46, 57), (43 + sw * 0.3, 60), (37 + sw * 0.6, 60)], r0=2.4, r1=2.0)
-    contour(c, ("tail",), ("hr", "body", "hpr"))
-    # front legs: short straight columns between haunches into white paws
-    for side, part in ((-1, "fl"), (1, "fr")):
-        x = CX + side * 3.6
-        lift = paw_up if side > 0 else 0
-        capsule(c, x, 49, x, SOLE - 2 - lift, 2.8, 2.6, FUR, "fur", part)
-        sock(c, part, SOLE - 4 - lift)
-        paw_front(c, x, SOLE - lift, part, lifted=lift > 0)
-    contour(c, ("fl", "fr"), ("body",), min_y=52)
-    contour(c, ("fl",), ("fr",))
-    contour(c, ("fr",), ("fl",))
-    front_head(c, dy=4 + head_dy, eyes=eyes, dx=head_dx, mouth=mouth, ears=ears, blush=blush)
-    contour(c, ("head",), ("body",), min_y=34)
-    return finish(c, [(CX - 15, CX + 15)])
+    tl(c, [(31.5 + brx - 4, bcy + 4), (31.5 + brx + 4, bcy + 3), (31.5 + brx + 7 + sw * 0.4, bcy - 2), (31.5 + brx + 7 + sw, bcy - 8)], 3.0, 2.5)
+    for side, part in ((-1, "hl"), (1, "hr")):
+        el(c, 31.5 + side * (brx - 2.5), bcy + 2.5, 6.0, 6.5, FUR, "fur", part, bias=-0.05)
+    el(c, 31.5, bcy, brx, bry, FUR, "fur", "body")
+    el(c, 31.5, bcy - 0.5, brx * 0.55, bry * 0.9, WHT, "white", "body", bias=0.15,
+       clip=lambda x, y: c.part.get((x, y)) == "body")
+    stamp(c, ix_(31.5 - brx) + 1, iy_(bcy) - 3, ["s.", "ss", ".S"], EM, "fur", "body", only_on=("body",))
+    stamp(c, ix_(31.5 + brx) - 2, iy_(bcy) - 3, [".s", "ss", "S."], EM, "fur", "body", only_on=("body",))
+    ct(c, ("body",), ("hl", "hr"), min_y=bcy)
+    for side, part in ((-1, "hpl"), (1, "hpr")):
+        paw(c, 31.5 + side * (brx + 0.5), SOLE, part)
+    for i, (side, part) in enumerate(((-1, "fl"), (1, "fr"))):
+        lift = paws[i]
+        x0 = 31.5 + side * 3.6
+        x1 = x0 + side * paw_out[i]
+        foot = SOLE - lift
+        fy = (foot - SOLE) / K + 60.0
+        cap(c, x0, bcy + 1, x1, fy - 2, 2.9, 2.7, FUR, "fur", part)
+        sock(c, part, foot - 5)
+        paw(c, x1, foot, part, lifted=lift > 0)
+    ct(c, ("fl", "fr"), ("body", "hl", "hr"), min_y=bcy + 1)
+    ct(c, ("fl",), ("fr",))
+    ct(c, ("fr",), ("fl",))
+    front_head(c, dy=SIT["hdy"] + P(head_dy), dx=P(head_dx), eyes=eyes, mouth=mouth, ears=ears)
+    ct(c, ("head",), ("body",), min_y=HEAD["cy"] + 2)
+    return finish(c, [(X(31.5 - brx - 4), X(31.5 + brx + 4))])
 
 
-def sit_back(tail_sway=0):
+def sit_back(tail_sway=0.0):
     c = Cv()
-    ellipse(c, CX, 47.5, 12.5, 12.5, FUR, "fur", "body")
-    for yy in range(37, 50):
-        for xx in (31, 32):
+    bcy, brx, bry = SIT["cy"], SIT["rx"] + 1, SIT["ry"] + 0.6
+    el(c, 31.5, bcy, brx, bry, FUR, "fur", "body")
+    for yy in range(iy_(bcy - bry), iy_(bcy + 3)):
+        for xx in (int(CX), int(CX) + 1):
             if c.part.get((xx, yy)) == "body":
                 c.px[(xx, yy)] = STRIPE if c.px[(xx, yy)] in (FUR[0], FUR[1]) else STRIPE_D
-    stripe_band(c, [(CX - 9.5, 43), (CX - 6.5, 42)], ("body",))
-    stripe_band(c, [(CX + 6.5, 42), (CX + 9.5, 43)], ("body",))
+    for dy in (-2.0, 1.0):
+        sb(c, [(31.5 - 9, bcy + dy + 1), (31.5 - 4, bcy + dy)], ("body",))
+        sb(c, [(31.5 + 4, bcy + dy), (31.5 + 9, bcy + dy + 1)], ("body",))
     for side in (-1, 1):
-        ellipse(c, CX + side * 10.5, SOLE - 1.0, 3.6, 1.9, WHT, "white", "paw%d" % side, bias=0.2)
+        paw(c, 31.5 + side * (brx - 1), SOLE, "paw%d" % side)
     sw = tail_sway
-    tail(c, [(36, 57), (44, 59), (50 + sw * 0.5, 56), (52 + sw, 49)], r0=2.6, r1=2.0)
-    contour(c, ("tail",), ("body",))
-    back_head(c, dy=6)
-    contour(c, ("head",), ("body",), min_y=34)
-    return finish(c, [(CX - 15, CX + 15)])
+    tl(c, [(31.5 + 2, 56.5), (31.5 + 9, 57.5), (31.5 + 14 + sw * 0.4, 55), (31.5 + 15 + sw, 49)], 2.9, 2.5)
+    ct(c, ("tail",), ("body", "paw1"))
+    back_head(c, dy=SIT["hdy"] + 1)
+    ct(c, ("head",), ("body",), min_y=HEAD["cy"] + 2)
+    return finish(c, [(X(31.5 - brx - 3), X(31.5 + brx + 3))])
 
 
-def sit_side(eyes="open", tail_sway=0):
+def sit_side(eyes="open", tail_sway=0.0):
     c = Cv()
     sw = tail_sway
-    # upright body (chest forward), haunch behind
-    ellipse(c, 28.5, 47.0, 9.5, 12.0, FUR, "fur", "body")
-    ellipse(c, 34.5, 45.0, 4.0, 7.0, WHT, "white", "body", bias=0.2,
-            clip=lambda x, y: c.part.get((x, y)) == "body")
-    # near haunch: big round thigh resting on the floor
-    ellipse(c, 23.0, 51.5, 8.5, 8.0, FUR, "fur", "nh", bias=-0.04)
-    stripe_band(c, [(17, 47), (18, 50)], ("nh",))
-    contour(c, ("nh",), ("body",))
-    # hind paw flat on the floor in front of the haunch
-    ellipse(c, 28.5, SOLE - 1.0, 4.6, 1.9, WHT, "white", "nhp", bias=0.2)
-    contour(c, ("nhp",), ("nh",))
-    # tail along the floor, wrapping toward the front
-    tail(c, [(15, 55), (13, 59), (20, 60), (27 + sw, 60)], r0=2.3, r1=1.9)
-    contour(c, ("tail",), ("nh", "nhp", "body"))
-    # straight front leg
-    capsule(c, 35.0, 47, 36.0, SOLE - 2, 3.0, 2.6, FUR, "fur", "nf")
-    sock(c, "nf", SOLE - 4)
-    ellipse(c, 37.0, SOLE - 1.0, 3.3, 1.9, WHT, "white", "nf", bias=0.2)
-    contour(c, ("nf",), ("body", "nh", "nhp", "tail"), min_y=50)
-    side_head(c, dx=-3, dy=5, eyes=eyes)
-    contour(c, ("head",), ("body",))
-    return finish(c, [(14, 41)])
+    # tail along the floor behind, wrapping forward, white pom in front
+    el(c, 28.5, 51.0, 8.0, 8.4, FUR, "fur", "body")
+    el(c, 33.5, 50.0, 3.4, 6.0, WHT, "white", "body", bias=0.2, clip=lambda x, y: c.part.get((x, y)) == "body")
+    el(c, 24.5, 54.5, 6.8, 5.6, FUR, "fur", "nh", bias=-0.04)
+    sb(c, [(20, 51), (21, 54)], ("nh",))
+    sb(c, [(25, 44), (24, 47)], ("body",))
+    ct(c, ("nh",), ("body",))
+    paw(c, 29.0, SOLE, "nhp")
+    ct(c, ("nhp",), ("nh",))
+    # tail wraps from behind the haunch along the floor, pom in front of the hind paw
+    tl(c, [(17, 55), (16, 58.4), (22, 58.8), (30 + sw, 58.6)], 2.6, 2.3)
+    ct(c, ("tail",), ("nh", "nhp", "body"))
+    cap(c, 34.0, 50, 35.0, 58, 3.0, 2.7, FUR, "fur", "nf")
+    sock(c, "nf", SOLE - 5)
+    paw(c, 35.6, SOLE, "nf")
+    ct(c, ("nf",), ("body", "nh", "nhp", "tail"), min_y=52)
+    side_head(c, dx=-3.5, dy=1.5, eyes=eyes)
+    ct(c, ("head",), ("body",))
+    return finish(c, [(X(14), X(40))])
 
 
 # ---------------------------------------------------------------------------
-# Eat (side view, head down into the bowl, chewing)
+# Eat (side): head dips into the bowl ahead, chews
 # ---------------------------------------------------------------------------
 def eat_side(f):
-    """6 frames: lower(0,1) chew(2..5). Bowl is a separate prop in game."""
-    c = Cv()
-    dips = [6, 12, 16, 15, 16, 15]
+    dips = [3, 7, 10, 9, 10, 9]
     chew = ["closed", "closed", "open", "closed", "open", "closed"]
-    dip = dips[f]
-    tp = [(15, 38), (9, 34 + (f % 2)), (6, 28), (7 - (f % 2), 22)]
-    tail(c, tp, r0=2.7, r1=2.0)
-    side_hind(c, 22.0, 43.0, 21.5, 0, "fh", far=True)
-    side_fore(c, 40.0, 42.0, 41.0, 0, "ff", far=True)
-    ellipse(c, 29.0, 41.5, 15.0, 8.0, FUR, "fur", "body")
-    ellipse(c, 40.5, 43.5, 4.2, 5.0, WHT, "white", "body", bias=0.15,
-            clip=lambda x, y: c.part.get((x, y)) == "body")
-    for sx in (20, 25, 30, 35):
-        stripe_band(c, [(sx, 34), (sx - 1, 37), (sx - 1, 40)], ("body",))
-    contour(c, ("body",), ("fh", "ff"), min_y=43)
-    side_hind(c, 19.5, 43.5, 18.5, 0, "nh")
-    side_fore(c, 38.0, 43.0, 39.0, 0, "nf")
-    contour(c, ("nh",), ("body", "fh", "tail"), min_y=46)
-    contour(c, ("nf",), ("body", "ff"), min_y=46)
-    # neck stretches down/forward, head lowered toward the bowl
-    hdx = 1 + int(dip * 0.2)
-    capsule(c, 39, 37, HEAD_S["cx"] + hdx - 3, HEAD_S["cy"] + dip - 2, 5.2, 5.0, FUR, "fur", "neck")
-    side_head(c, dx=hdx, dy=dip, eyes="half" if dip > 10 else "open",
-              ears="up", mouth=chew[f])
-    contour(c, ("head",), ("body", "neck", "nf", "ff"))
-    return finish(c, [(15, 22), (18, 25), (35, 43), (38, 45)])
+    d = dips[f]
+    bx, by, brx = SBODY["cx"], SBODY["cy"], SBODY["rx"]
+    t0 = bx - brx * 0.85
+    tp = [(t0 + 1, by - 2), (t0 - 4, by - 7 + (f % 2)), (t0 - 5, by - 14), (t0 - 3 - (f % 2), by - 19)]
+    # front legs splay a touch forward, rump stays up
+    return side_stand(feet={"NF": (1.5, 0), "FF": (1.5, 0), "NH": (0, 0), "FH": (0, 0)}, tail_pts=tp,
+                      head_dy=int(round(d * K)), head_dx=int(round(d * 0.45 * K)),
+                      eyes="half" if d >= 8 else "open", mouth=chew[f], lean=0.8)
 
 
 # ---------------------------------------------------------------------------
-# Happy / petted (front, sitting) — eyes close, lean into the hand
+# Happy / petted (front sit)
 # ---------------------------------------------------------------------------
 def happy_front(f):
-    sway = [-2, 0, 2, 0][f % 4]
-    return sit_front(eyes="happy", tail_sway=sway, head_dy=[0, -1, 0, -1][f % 4], mouth="w")
+    return sit_front(eyes="happy", tail_sway=[-2, 0, 2, 0][f % 4], head_dy=[0, -1, 0, -1][f % 4], mouth="open" if f % 2 else "w")
 
 
 def petted_front(f):
-    # leans head up into the stroking hand, ears relaxed back, eyes shut
     lean = [0, -1, -2, -1][f % 4]
     return sit_front(eyes="happy" if f % 4 in (1, 2) else "shut", head_dy=lean,
                      ears="flat" if f % 4 in (1, 2) else "up", tail_sway=[0, 1, 2, 1][f % 4])
 
 
 # ---------------------------------------------------------------------------
-# Play (side pounce / bat) and front bat
+# Play
 # ---------------------------------------------------------------------------
+def _tp(by, a, b, c2, d):
+    bx, brx = SBODY["cx"], SBODY["rx"]
+    t0 = bx - brx * 0.85
+    yb = SBODY["cy"] + P(by)
+    return [(t0 + 1 + a[0], yb - 2 + a[1]), (t0 - 4 + b[0], yb - 7 + b[1]), (t0 - 5 + c2[0], yb - 14 + c2[1]), (t0 - 3 + d[0], yb - 19 + d[1])]
+
+
 def play_side(f):
-    """8 frames: crouch, wiggle, wiggle, leap, stretch, land, bat up, bat down."""
+    """crouch, wiggle, wiggle, spring, airborne, land, bat up, bat down."""
     if f in (0, 1, 2):
-        # crouch: body low, rump up, tail flick
         wig = [0, 1, -1][f]
-        c = side_stand(bob=3, feet={"NF": (2, 0), "FF": (2, 0), "NH": (-1 + wig, 0), "FH": (-1 + wig, 0)},
-                       tail_pts=[(15, 40), (9, 40 + wig), (4, 38), (2, 34 + wig)], head_dy=1, ears="up")
-        return c
-    if f == 3:  # spring
-        return side_stand(bob=-3, feet={"NF": (4, 4), "FF": (5, 5), "NH": (-3, 0), "FH": (-2, 0)},
-                          tail_pts=[(15, 35), (9, 33), (5, 30), (3, 26)], head_dy=-1)
-    if f == 4:  # airborne stretch
-        return side_stand(bob=-5, feet={"NF": (6, 7), "FF": (7, 8), "NH": (-5, 4), "FH": (-4, 3)},
-                          tail_pts=[(14, 33), (8, 32), (3, 31), (0, 29)], head_dy=-1)
-    if f == 5:  # land
+        return side_stand(bob=3, feet={"NF": (2.5, 0), "FF": (2.5, 0), "NH": (-1 + wig, 0), "FH": (-1 + wig, 0)},
+                          tail_pts=_tp(3, (0, 0), (-1, 4 + wig), (-3, 9), (-6, 11 + wig)), head_dy=2)
+    if f == 3:
+        return side_stand(bob=-3, feet={"NF": (3, 4), "FF": (4, 5), "NH": (-2, 0), "FH": (-1, 0)},
+                          tail_pts=_tp(-3, (0, 0), (-1, 3), (-3, 6), (-5, 7)), head_dy=-1)
+    if f == 4:
+        return side_stand(bob=-7, feet={"NF": (5, 6), "FF": (6, 7), "NH": (-4, 4), "FH": (-3, 3)},
+                          tail_pts=_tp(-7, (0, 0), (-2, 4), (-5, 8), (-9, 10)), head_dy=-1, eyes="open")
+    if f == 5:
         return side_stand(bob=2, feet={"NF": (3, 0), "FF": (4, 0), "NH": (-2, 0), "FH": (-1, 0)},
-                          tail_pts=[(15, 39), (9, 36), (6, 30), (7, 25)])
-    if f == 6:  # bat up
-        return side_stand(bob=0, feet={"NF": (4, 8), "FF": (0, 0), "NH": (0, 0), "FH": (0, 0)},
-                          tail_pts=[(15, 38), (9, 34), (6, 27), (8, 21)], ears="up")
-    return side_stand(bob=1, feet={"NF": (6, 2), "FF": (0, 0), "NH": (0, 0), "FH": (0, 0)},
-                      tail_pts=[(15, 38), (9, 33), (7, 26), (10, 21)])
+                          tail_pts=_tp(2, (0, 0), (0, 1), (-1, 2), (0, 2)), head_dy=1)
+    if f == 6:
+        return side_stand(bob=0, feet={"NF": (4, 9), "FF": (0, 0), "NH": (0, 0), "FH": (0, 0)},
+                          tail_pts=_tp(0, (0, 0), (0, 0), (0, 0), (1, 0)), mouth="open")
+    return side_stand(bob=1, feet={"NF": (6, 3), "FF": (0, 0), "NH": (0, 0), "FH": (0, 0)},
+                      tail_pts=_tp(1, (0, 0), (0, 0), (1, 0), (2, 0)))
 
 
 def play_front(f):
-    """6 frames: sits up and bats with alternating paws."""
     ups = [(0, 0), (6, 0), (9, 0), (0, 6), (0, 9), (0, 0)]
     l, r = ups[f]
-    c = Cv()
-    ellipse(c, CX - 9.0, 51.0, 6.5, 8.0, FUR, "fur", "hl", bias=-0.05)
-    ellipse(c, CX + 9.0, 51.0, 6.5, 8.0, FUR, "fur", "hr", bias=-0.05)
-    ellipse(c, CX, 46.0, 11.0, 11.5, FUR, "fur", "body")
-    ellipse(c, CX, 45.0, 6.0, 8.5, WHT, "white", "body", bias=0.15,
-            clip=lambda x, y: c.part.get((x, y)) == "body")
-    contour(c, ("body",), ("hl", "hr"), min_y=46)
-    for side in (-1, 1):
-        ellipse(c, CX + side * 11.5, SOLE - 1.0, 3.6, 1.9, WHT, "white", "hp%d" % side, bias=0.2)
-    sw = [0, 2, 3, -2, -3, 0][f]
-    tail(c, [(42, 56), (47, 55), (51 + sw * 0.4, 49), (50 + sw, 42)], r0=2.4, r1=2.0)
-    for side, lift, part in ((-1, l, "fl"), (1, r, "fr")):
-        x = CX + side * (3.6 + lift * 0.85)
-        foot = SOLE - lift
-        if lift:
-            capsule(c, CX + side * 3.6, 45, x, foot - 2, 2.9, 2.6, FUR, "fur", part)
-        else:
-            capsule(c, x, 49, x, foot - 2, 2.8, 2.6, FUR, "fur", part)
-        sock(c, part, foot - 4)
-        paw_front(c, x, foot, part, lifted=lift > 0)
-    contour(c, ("fl", "fr"), ("body", "hl", "hr"), min_y=40)
-    front_head(c, dy=3 - (1 if (l or r) else 0), eyes="open", mouth="open" if f in (2, 4) else "w")
-    contour(c, ("head",), ("body",), min_y=33)
-    return finish(c, [(CX - 15, CX + 15)])
+    return sit_front(eyes="open", tail_sway=[0, 2, 3, -2, -3, 0][f], head_dy=-1 if (l or r) else 0,
+                     mouth="open" if f in (2, 4) else "w", paws=(l, r),
+                     paw_out=(l * 0.35 / K, r * 0.35 / K))
 
 
 # ---------------------------------------------------------------------------
-# Sleep (curled side-on ball, breathing)
+# Sleep (curled, breathing)
 # ---------------------------------------------------------------------------
 def sleep_curl(f):
     br = [0, 1, 1, 0][f % 4]
     c = Cv()
-    ellipse(c, 31.0, 52.0 - br * 0.5, 17.0, 8.5 + br * 0.5, FUR, "fur", "body")
-    for sx in (20, 26, 32, 38):
-        stripe_band(c, [(sx, 44 - br), (sx - 1, 48), (sx - 1, 51)], ("body",))
-    # tail wrapped around the front
-    tail(c, [(46, 56), (40, 59), (30, 60), (20, 59)], r0=2.5, r1=2.0)
-    contour(c, ("tail",), ("body",))
-    # head tucked on the left resting on paws
-    hx, hy = 19.0, 50.0 - br * 0.5
-    poly(c, [(hx - 6, hy - 5), (hx - 7.5, hy - 12), (hx - 1, hy - 7)], lambda x, y: FUR[2], "fur", "head_ear")
-    poly(c, [(hx + 1, hy - 7), (hx + 5, hy - 13), (hx + 8, hy - 6)], lambda x, y: FUR[1], "fur", "head_ear")
-    c.put(int(hx) + 5, int(hy) - 9, PINK, "detail", "head_ear")
-    c.put(int(hx) + 5, int(hy) - 8, PINK, "detail", "head_ear")
-    ellipse(c, hx, hy, 9.5, 7.5, FUR, "fur", "head", bias=0.04)
-    ellipse(c, hx, hy + 3.8, 5.5, 3.2, WHT, "white", "head", bias=0.25)
-    ix, iy = int(hx), int(round(hy))
-    stamp(c, ix - 1, iy - 7, ["ss", "Ss"], EYEMAP, "fur", "head")
-    stamp(c, ix - 6, iy - 2, EYE_SHUT, EYEMAP, "detail", "head")
-    stamp(c, ix + 2, iy - 2, EYE_SHUT, EYEMAP, "detail", "head")
-    c.put(ix + 1, iy + 2, NOSE, "detail", "head")
-    c.put(ix + 2, iy + 2, NOSE, "detail", "head")
-    c.put(ix - 6, iy + 2, BLUSH, "detail", "head")
-    c.put(ix + 8, iy + 2, BLUSH, "detail", "head")
-    # front paws under chin
-    ellipse(c, hx + 4, 58.5, 3.4, 1.9, WHT, "white", "paw", bias=0.2)
-    ellipse(c, hx - 3, 58.5, 3.4, 1.9, WHT, "white", "paw2", bias=0.2)
-    contour(c, ("head",), ("body", "tail"))
-    contour(c, ("paw", "paw2"), ("head", "body", "tail"))
-    return finish(c, [(12, 50)])
+    b = P(br)
+    el(c, 33.0, 53.5 - b * 0.5, 14.0, 6.5 + b * 0.5, FUR, "fur", "body")
+    for sx in (26, 31, 36, 41):
+        sb(c, [(sx, 47.5 - b), (sx - 1, 50.5), (sx - 1, 53)], ("body",))
+    tl(c, [(46, 56), (42, 59.2), (33, 59.6), (25, 59)], 2.7, 2.3)
+    ct(c, ("tail",), ("body",))
+    # big head resting on the left, eyes shut
+    hx, hy = 20.0, 49.5 - b * 0.5
+    rx, ry = 11.5, 9.5
+    for side, tipx in ((-1, -8.5), (1, 6.5)):
+        tip = (hx + tipx, hy - ry - 2.6)
+        cyc = Y(tip[1] + 2.2)
+        pl(c, [(hx + tipx - side * 1 - 3, hy - ry * 0.4), tip, (hx + tipx + 4 - side, hy - ry * 0.75)],
+           lambda x, y, cyc=cyc: FUR[1 if side > 0 else 2] if y >= cyc else None, "fur", "head_ear")
+        el(c, tip[0], tip[1] + 2.2, 2.2, 2.2, FUR, "fur", "head_ear", bias=0.1)
+    tx, ty = ix_(hx + 6.5), iy_(hy - ry - 1.2)
+    for j, row in enumerate(["pp", "pPp", "pPp"]):
+        for i, ch in enumerate(row):
+            c.put(tx - 1 + i, ty + j, EM[ch], "detail", "head_ear")
+    el(c, hx, hy, rx, ry, FUR, "fur", "head", bias=0.04)
+    el(c, hx, hy + ry * 0.55, 4.2, 2.8, WHT, "white", "head", bias=0.25)
+    ix, iy = int(math.floor(X(hx))), iy_(hy)
+    top = iy_(hy - ry) + 2
+    stamp(c, ix, top, ["ss", "ss", "SS"], EM, "fur", "head")
+    stamp(c, ix - 4, top + 1, ["s", "s", "S"], EM, "fur", "head")
+    stamp(c, ix + 5, top + 1, ["s", "s", "S"], EM, "fur", "head")
+    ex = int(round(rx * 0.42 * K))
+    stamp(c, ix - ex - 5, iy - 4, EYE_SHUT[8:], EM, "detail", "head")
+    stamp(c, ix + ex - 5, iy - 4, EYE_SHUT[8:], EM, "detail", "head")
+    for sx in (ix - ex - 5, ix + ex - 1):
+        stamp(c, sx, iy + 2, ["bBBb", ".bb."], EM, "detail", "head", only_on=("head",))
+    ny = iy_(hy + ry * 0.55) - 2
+    c.put(ix, ny, NOSE, "detail", "head")
+    c.put(ix + 1, ny, NOSE, "detail", "head")
+    paw(c, hx + 5, SOLE - 1, "paw")
+    paw(c, hx - 4, SOLE - 1, "paw2")
+    ct(c, ("head",), ("body", "tail"))
+    ct(c, ("paw", "paw2"), ("head", "body", "tail"))
+    # "z" bubble is a game FX, not baked here
+    return finish(c, [(X(8), X(48))])
 
 
 # ---------------------------------------------------------------------------
@@ -1111,15 +1097,14 @@ def build_all():
 if __name__ == "__main__":
     import sys
     A = build_all()
-    sc = 4
-    rows = []
-    for name, (frames, fps, loop) in A.items():
-        rows.append((name, frames))
-    maxn = max(len(f) for _, f in rows)
-    sheet = Image.new("RGBA", (maxn * (W * sc + 4) + 4, len(rows) * (H * sc + 4) + 4), (60, 54, 66, 255))
-    for r, (name, frames) in enumerate(rows):
+    sc = int(sys.argv[2]) if len(sys.argv) > 2 else 4
+    rows = list(A.items())
+    maxn = max(len(v[0]) for _, v in rows)
+    sheet = Image.new("RGBA", (maxn * (W * sc + 4) + 4, len(rows) * (H * sc + 4) + 4), (250, 240, 226, 255))
+    for r, (name, (frames, fps, loop)) in enumerate(rows):
         for i, fr in enumerate(frames):
-            sheet.paste(fr.image(sc), (4 + i * (W * sc + 4), 4 + r * (H * sc + 4)), fr.image(sc))
+            im = fr.image(sc)
+            sheet.paste(im, (4 + i * (W * sc + 4), 4 + r * (H * sc + 4)), im)
     out = sys.argv[1] if len(sys.argv) > 1 else "/tmp/cat_art_sheet.png"
     sheet.save(out)
     print("wrote", out, sheet.size)

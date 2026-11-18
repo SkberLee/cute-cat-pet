@@ -45,6 +45,8 @@ var _toast_tween: Tween
 ## World rows the portrait camera keeps between the HUD card and the buttons.
 const WORLD_TOP := -6.0
 const WORLD_BOTTOM := 212.0
+const PORTRAIT_VIEW_W := 196.0
+var _queued := Callable()
 
 func _ready() -> void:
 	_style_ui()
@@ -163,18 +165,34 @@ func _fit_camera_metrics() -> void:
 		else:
 			bottom_ui = vis.y - 250.0
 		var band := maxf(bottom_ui - top_ui, vis.y * 0.4)
-		var z := band / (WORLD_BOTTOM - WORLD_TOP)
-		z = maxf(z, vis.x / ROOM_SIZE.x)
+		# v0.3.1: fixed, composed portrait slice — PORTRAIT_VIEW_W world px wide,
+		# centred on the window; the wall/floor line sits ~40% down the band.
+		var z := vis.x / PORTRAIT_VIEW_W
+		var world_h := band / z
+		if world_h < (WORLD_BOTTOM - WORLD_TOP):
+			z = band / (WORLD_BOTTOM - WORLD_TOP)
+			world_h = WORLD_BOTTOM - WORLD_TOP
 		_cam_fit_zoom = Vector2(z, z)
-		var y := WORLD_TOP + (vis.y * 0.5 - top_ui) / z
-		var x := ROOM_SIZE.x * 0.5
-		if cat:
-			x = _clamp_cam_x(cat.global_position.x, z)
-		_cam_fit_pos = Vector2(x, y)
+		var ytop := minf(WORLD_TOP, 72.0 - 0.40 * world_h)
+		var y := ytop + (vis.y * 0.5 - top_ui) / z
+		_cam_fit_pos = Vector2(ROOM_SIZE.x * 0.5, y)
+		var half := vis.x / z * 0.5
+		if cat and cat.has_method("set_floor"):
+			cat.set_floor(Vector2(ROOM_SIZE.x * 0.5 - half + 26.0, 100.0),
+				Vector2(ROOM_SIZE.x * 0.5 + half - 26.0, minf(ytop + world_h - 26.0, 268.0)))
+		_layout_room(true)
 		return
+	if cat and cat.has_method("set_floor"):
+		cat.set_floor(Vector2(36, 100), Vector2(284, 196))
+	_layout_room(false)
 	var zl := minf(vis.x / ROOM_SIZE.x, vis.y / ROOM_SIZE.y)
 	_cam_fit_zoom = Vector2(zl, zl)
 	_cam_fit_pos = Vector2(ROOM_SIZE.x * 0.5, ROOM_SIZE.y * 0.5 - 12.0)
+
+func _layout_room(portrait: bool) -> void:
+	var room := get_node_or_null("../World/Room")
+	if room and room.has_method("layout"):
+		room.layout(portrait)
 
 func _clamp_cam_x(x: float, z: float) -> float:
 	var vis := get_viewport().get_visible_rect().size
@@ -198,7 +216,7 @@ func _process(delta: float) -> void:
 	# Portrait: follow the cat sideways inside the room; landscape: stay room-framed.
 	var target := _cam_fit_pos
 	if _portrait:
-		target = Vector2(_clamp_cam_x(cat.global_position.x, camera.zoom.x), _cam_fit_pos.y)
+		target = _cam_fit_pos  # composed slice stays put; the cat walks inside it
 	else:
 		target = _cam_fit_pos.lerp(cat.global_position + Vector2(0, -20), 0.22)
 	camera.position = camera.position.lerp(target, clampf(CAM_FOLLOW_SPEED * delta, 0.0, 1.0))
@@ -519,10 +537,23 @@ func _set_buttons_enabled(enabled: bool) -> void:
 	btn_play.disabled = not enabled
 
 func _on_busy(_action: String, _item: String = "") -> void:
-	_set_buttons_enabled(false)
+	# v0.3.1: buttons stay live (greying them out for seconds looked frozen).
+	pass
 
 func _on_ready_again() -> void:
 	_set_buttons_enabled(true)
+	if _queued.is_valid():
+		var q := _queued
+		_queued = Callable()
+		q.call_deferred()
+
+## Run now, or remember the latest press and run it as soon as the cat is free.
+func _run_or_queue(cb: Callable) -> void:
+	if cat and ((cat.has_method("is_busy_action") and cat.is_busy_action()) or (cat.has_method("can_interact") and not cat.can_interact())):
+		_queued = cb
+		_bubble_say("等我一下下，马上就来～")
+		return
+	cb.call()
 
 func _bubble_say(text: String, soft: bool = true) -> void:
 	if speech_bubble and speech_bubble.has_method("show_line"):
@@ -533,7 +564,7 @@ func _bubble_say(text: String, soft: bool = true) -> void:
 func _on_pet() -> void:
 	_close_pickers()
 	if cat and cat.has_method("do_pet"):
-		cat.do_pet()
+		_run_or_queue(func(): cat.do_pet())
 
 func _on_feed() -> void:
 	if food_picker == null:
@@ -558,12 +589,12 @@ func _on_play() -> void:
 func _on_food_picked(id: String) -> void:
 	_close_pickers()
 	if cat and cat.has_method("do_feed"):
-		cat.do_feed(id)
+		_run_or_queue(func(): cat.do_feed(id))
 
 func _on_toy_picked(id: String) -> void:
 	_close_pickers()
 	if cat and cat.has_method("do_play"):
-		cat.do_play(id)
+		_run_or_queue(func(): cat.do_play(id))
 
 func _close_pickers() -> void:
 	if food_picker:
@@ -605,9 +636,11 @@ func _toast(text: String) -> void:
 	_toast_panel.reset_size()
 	var vis := get_viewport().get_visible_rect().size
 	var sz := _toast_panel.get_combined_minimum_size()
-	var y := stats_card.get_global_rect().end.y + 14.0 if stats_card else 200.0
+	var y := vis.y * 0.5
+	if buttons and buttons.size.y > 1.0:
+		y = buttons.get_global_rect().position.y - sz.y - 18.0
 	if not _portrait:
-		y = 24.0
+		y = vis.y - (buttons.size.y if buttons else 120.0) - sz.y - 30.0
 	_toast_panel.size = sz
 	_toast_panel.position = Vector2((vis.x - sz.x) * 0.5, y)
 	_toast_panel.visible = true
